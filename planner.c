@@ -1,8 +1,11 @@
 #include <gtk/gtk.h>
+#include <stdlib.h>
+#include <windows.h>
 #include "planner_ui.h"
 
 GtkBuilder *builder = NULL;
 gchar *path = NULL;
+gchar *dir = NULL;
 
 void
 save() {
@@ -12,6 +15,11 @@ save() {
 	gchar *text;
 
 	if (path == NULL) {
+		return;
+	}
+
+	if (g_mkdir_with_parents(dir, 0700) != 0) {
+		fprintf(stderr, "unable to make directory %s\n", dir);
 		return;
 	}
 
@@ -49,38 +57,29 @@ load() {
 	g_free(text);
 }
 
-void
+G_MODULE_EXPORT void
 on_calendar1_day_selected(GtkCalendar *widget, gpointer unused) {
 	guint year, month, day;
-	gchar *dir;
 
 	gtk_calendar_get_date(widget, &year, &month, &day);
 
-	if (path != NULL) {
+	if (path != NULL)
 		g_free(path);
-		path = NULL;
-	}
+	if (dir != NULL)
+		g_free(dir);
 
-	dir = g_strdup_printf("%s/.plans/%d/%02d/%02d/", g_get_home_dir(), year, month + 1, day);
+	dir = g_strdup_printf("%s/.plans/%d/%02d/%02d/", g_getenv("USERPROFILE"), year, month + 1, day);
+	path = g_strconcat(dir, "index.txt", NULL);
 
-	if (g_mkdir_with_parents(dir, 0700) == 0) {
-		path = g_strconcat(dir, "index.md", NULL);
-		load();
-
-	} else {
-		fprintf(stderr, "unable to make directory %s\n", dir);
-
-	}
-
-	g_free(dir);
+	load();
 }
 
-void
+G_MODULE_EXPORT void
 on_notes_paste_clipboard(GtkTextView *widget, gpointer unused) {
 	save();
 }
 
-void
+G_MODULE_EXPORT void
 on_notes_key_release_event(GtkTextView *widget, gpointer unused) {
 	save();
 }
@@ -106,4 +105,8 @@ int main(int argc, char **argv) {
 	gtk_main();
 
 	return 0;
+}
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+	return main(__argc, __argv);
 }

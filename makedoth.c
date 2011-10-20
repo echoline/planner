@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <linux/limits.h>
+//#include <linux/limits.h>
+#define PATH_MAX 65535
 
 int main(int argc, char **argv) {
 	int i, j, len, res, total;
