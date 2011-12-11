@@ -1,4 +1,8 @@
 #include <gtk/gtk.h>
+#include <stdlib.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include "planner_ui.h"
 
 GtkBuilder *builder = NULL;
@@ -69,19 +73,21 @@ load() {
 	g_free(text);
 }
 
-void
+G_MODULE_EXPORT void
 on_calendar1_day_selected(GtkCalendar *widget, gpointer unused) {
 	guint year, month, day;
 	gchar *dir, *errstr;
 
 	gtk_calendar_get_date(widget, &year, &month, &day);
 
-	if (path != NULL) {
+	if (path != NULL)
 		g_free(path);
-		path = NULL;
-	}
 
-	dir = g_strdup_printf("%s/.plans/%d/%02d/%02d/", g_get_home_dir(), year, month + 1, day);
+#ifdef _WIN32
+	dir = g_strdup_printf("%s/.plans/%d/%02d/%02d/", g_getenv("USERPROFILE"), year, month + 1, day);
+#else
+	dir = g_strdup_printf("%s/.plans/%d/%02d/%02d/", g_getenv("HOME"), year, month + 1, day);
+#endif
 
 	if (g_mkdir_with_parents(dir, 0700) == 0) {
 		path = g_strconcat(dir, "index.md", NULL);
@@ -97,12 +103,12 @@ on_calendar1_day_selected(GtkCalendar *widget, gpointer unused) {
 	g_free(dir);
 }
 
-void
+G_MODULE_EXPORT void
 on_notes_paste_clipboard(GtkTextView *widget, gpointer unused) {
 	save();
 }
 
-void
+G_MODULE_EXPORT void
 on_notes_key_release_event(GtkTextView *widget, gpointer unused) {
 	save();
 }
@@ -130,3 +136,9 @@ int main(int argc, char **argv) {
 
 	return 0;
 }
+
+#ifdef _WIN32
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+	return main(__argc, __argv);
+}
+#endif
