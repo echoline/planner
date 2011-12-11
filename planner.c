@@ -3,13 +3,29 @@
 
 GtkBuilder *builder = NULL;
 gchar *path = NULL;
+GtkWidget *window;
+
+void
+error(char *errstr) {
+	GtkWidget *dialog = gtk_message_dialog_new (
+				(GtkWindow*)window,
+				GTK_DIALOG_DESTROY_WITH_PARENT,
+				GTK_MESSAGE_ERROR,
+				GTK_BUTTONS_CLOSE,
+				"%s", errstr);
+	g_signal_connect_swapped (dialog, "response",
+				G_CALLBACK (gtk_widget_destroy),
+				dialog);
+	gtk_window_set_icon_name((GtkWindow*)dialog, GTK_STOCK_NO);
+	gtk_widget_show_all(dialog);
+}
 
 void
 save() {
 	GtkTextView *widget;
 	GtkTextBuffer *buffer;
 	GtkTextIter start, end;
-	gchar *text;
+	gchar *text, *errstr;
 
 	if (path == NULL) {
 		return;
@@ -22,8 +38,12 @@ save() {
 	text = gtk_text_buffer_get_slice(buffer, &start, &end, TRUE);
 
 	if (g_file_set_contents(path, text, -1, NULL) == FALSE) {
-		fprintf(stderr, "unable to save %s\n", path); 
+		errstr = g_strdup_printf("unable to save to %s", path);
+		error(errstr);
+		g_free(errstr);
 	}
+
+	g_free(text);
 }
 
 void
@@ -52,7 +72,7 @@ load() {
 void
 on_calendar1_day_selected(GtkCalendar *widget, gpointer unused) {
 	guint year, month, day;
-	gchar *dir;
+	gchar *dir, *errstr;
 
 	gtk_calendar_get_date(widget, &year, &month, &day);
 
@@ -68,7 +88,9 @@ on_calendar1_day_selected(GtkCalendar *widget, gpointer unused) {
 		load();
 
 	} else {
-		fprintf(stderr, "unable to make directory %s\n", dir);
+		errstr = g_strdup_printf("unable to make directory %s", dir);
+		error(errstr);
+		g_free(errstr);
 
 	}
 
@@ -86,7 +108,6 @@ on_notes_key_release_event(GtkTextView *widget, gpointer unused) {
 }
 
 int main(int argc, char **argv) {
-	GtkWidget *window;
 	GError *error = NULL;
 
 	gtk_init(&argc, &argv);
@@ -97,6 +118,8 @@ int main(int argc, char **argv) {
 	
 	if (window == NULL)
 		return 4;
+
+	gtk_window_set_icon_name((GtkWindow*)window, GTK_STOCK_YES);
 
 	on_calendar1_day_selected((GtkCalendar*)gtk_builder_get_object(builder, "calendar1"), NULL);
 
