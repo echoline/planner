@@ -1,4 +1,5 @@
 a simple gtk planner
 
-![](http://eli.neoturbine.net/planner.png)
+http://eli.neoturbine.net/planner.png
 
+builds on linux (gentoo) and on windows (xp) with mingw and gtk
