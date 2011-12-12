@@ -24,6 +24,29 @@ error(char *errstr) {
 	gtk_widget_show_all(dialog);
 }
 
+
+gchar*
+makepath(guint year, guint month, guint day) {
+#ifdef _WIN32
+	return g_strdup_printf("%s/.plans/%d/%02d/%02d/", g_getenv("USERPROFILE"), year, month + 1, day);
+#else
+	return g_strdup_printf("%s/.plans/%d/%02d/%02d/", g_getenv("HOME"), year, month + 1, day);
+#endif
+}
+
+gchar*
+details(GtkCalendar *calendar, guint year, guint month, guint day, gpointer user_data) {
+	gchar *text;
+	gchar *dir = makepath(year, month, day);
+	gchar *path = g_strconcat(dir, "index.md", NULL);
+
+	g_free(dir);
+	g_file_get_contents(path, &text, NULL, NULL);
+	g_free(path);
+
+	return text;
+}
+
 void
 save() {
 	GtkTextView *widget;
@@ -83,11 +106,7 @@ on_calendar1_day_selected(GtkCalendar *widget, gpointer unused) {
 	if (path != NULL)
 		g_free(path);
 
-#ifdef _WIN32
-	dir = g_strdup_printf("%s/.plans/%d/%02d/%02d/", g_getenv("USERPROFILE"), year, month + 1, day);
-#else
-	dir = g_strdup_printf("%s/.plans/%d/%02d/%02d/", g_getenv("HOME"), year, month + 1, day);
-#endif
+	dir = makepath(year, month, day);
 
 	if (g_mkdir_with_parents(dir, 0700) == 0) {
 		path = g_strconcat(dir, "index.md", NULL);
@@ -114,6 +133,7 @@ on_notes_key_release_event(GtkTextView *widget, gpointer unused) {
 }
 
 int main(int argc, char **argv) {
+	GtkCalendar *calendar;
 	GError *error = NULL;
 
 	gtk_init(&argc, &argv);
@@ -127,7 +147,11 @@ int main(int argc, char **argv) {
 
 	gtk_window_set_icon_name((GtkWindow*)window, GTK_STOCK_YES);
 
-	on_calendar1_day_selected((GtkCalendar*)gtk_builder_get_object(builder, "calendar1"), NULL);
+	calendar = (GtkCalendar*)gtk_builder_get_object(builder, "calendar1");
+	gtk_calendar_set_detail_func(calendar, &details, NULL, NULL);
+	gtk_calendar_set_detail_width_chars(calendar, 3);
+	gtk_calendar_set_detail_height_rows(calendar, 1);
+	on_calendar1_day_selected(calendar, NULL);
 
 	gtk_builder_connect_signals(builder, NULL);
 
