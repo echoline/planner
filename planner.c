@@ -153,6 +153,8 @@ int main(int argc, char **argv) {
 	gtk_calendar_set_detail_height_rows(calendar, 1);
 	on_calendar1_day_selected(calendar, NULL);
 
+	gtk_window_set_title((GtkWindow*)window, "Planner");
+
 	gtk_builder_connect_signals(builder, NULL);
 
 	gtk_widget_show_all(window);
