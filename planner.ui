@@ -12,8 +12,8 @@
       <object class="GtkTable" id="table1">
         <property name="visible">True</property>
         <property name="can_focus">False</property>
-        <property name="n_rows">3</property>
-        <property name="n_columns">5</property>
+        <property name="n_rows">1</property>
+        <property name="n_columns">2</property>
         <child>
           <object class="GtkCalendar" id="calendar1">
             <property name="visible">True</property>
@@ -21,10 +21,10 @@
             <signal name="day-selected" handler="on_calendar1_day_selected" swapped="no"/>
           </object>
           <packing>
-            <property name="left_attach">1</property>
-            <property name="right_attach">2</property>
-            <property name="top_attach">1</property>
-            <property name="bottom_attach">2</property>
+            <property name="left_attach">0</property>
+            <property name="right_attach">1</property>
+            <property name="top_attach">0</property>
+            <property name="bottom_attach">1</property>
           </packing>
         </child>
         <child>
@@ -47,69 +47,10 @@
             </child>
           </object>
           <packing>
-            <property name="left_attach">3</property>
-            <property name="right_attach">4</property>
-            <property name="top_attach">1</property>
-            <property name="bottom_attach">2</property>
-          </packing>
-        </child>
-        <child>
-          <object class="GtkFixed" id="fixed1">
-            <property name="width_request">1</property>
-            <property name="visible">True</property>
-            <property name="can_focus">False</property>
-          </object>
-          <packing>
-            <property name="left_attach">2</property>
-            <property name="right_attach">3</property>
-            <property name="top_attach">1</property>
-            <property name="bottom_attach">2</property>
-          </packing>
-        </child>
-        <child>
-          <object class="GtkFixed" id="fixed2">
-            <property name="width_request">1</property>
-            <property name="visible">True</property>
-            <property name="can_focus">False</property>
-          </object>
-          <packing>
-            <property name="top_attach">1</property>
-            <property name="bottom_attach">2</property>
-          </packing>
-        </child>
-        <child>
-          <object class="GtkFixed" id="fixed3">
-            <property name="width_request">1</property>
-            <property name="visible">True</property>
-            <property name="can_focus">False</property>
-          </object>
-          <packing>
-            <property name="left_attach">4</property>
-            <property name="right_attach">5</property>
-            <property name="top_attach">1</property>
-            <property name="bottom_attach">2</property>
-          </packing>
-        </child>
-        <child>
-          <object class="GtkFixed" id="fixed4">
-            <property name="height_request">1</property>
-            <property name="visible">True</property>
-            <property name="can_focus">False</property>
-          </object>
-          <packing>
-            <property name="right_attach">5</property>
-            <property name="top_attach">2</property>
-            <property name="bottom_attach">3</property>
-          </packing>
-        </child>
-        <child>
-          <object class="GtkFixed" id="fixed5">
-            <property name="height_request">1</property>
-            <property name="visible">True</property>
-            <property name="can_focus">False</property>
-          </object>
-          <packing>
-            <property name="right_attach">5</property>
+            <property name="left_attach">1</property>
+            <property name="right_attach">2</property>
+            <property name="top_attach">0</property>
+            <property name="bottom_attach">1</property>
           </packing>
         </child>
       </object>
