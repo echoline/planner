@@ -7,6 +7,7 @@
 
 GtkBuilder *builder = NULL;
 gchar *path = NULL;
+gchar *dir = NULL;
 GtkWidget *window;
 
 void
@@ -54,8 +55,11 @@ save() {
 	GtkTextIter start, end;
 	gchar *text, *errstr;
 
-	if (path == NULL) {
-		return;
+	if (g_mkdir_with_parents(dir, 0700) != 0) {
+		errstr = g_strdup_printf("unable to make directory %s", dir);
+		error(errstr);
+		g_free(errstr);
+
 	}
 
 	widget = (GtkTextView*)gtk_builder_get_object(builder, "notes");
@@ -99,27 +103,20 @@ load() {
 G_MODULE_EXPORT void
 on_calendar1_day_selected(GtkCalendar *widget, gpointer unused) {
 	guint year, month, day;
-	gchar *dir, *errstr;
+	gchar *errstr;
 
 	gtk_calendar_get_date(widget, &year, &month, &day);
 
 	if (path != NULL)
 		g_free(path);
 
+	if (dir != NULL)
+		g_free(dir);
+
 	dir = makepath(year, month, day);
+	path = g_strconcat(dir, "index.md", NULL);
+	load();
 
-	if (g_mkdir_with_parents(dir, 0700) == 0) {
-		path = g_strconcat(dir, "index.md", NULL);
-		load();
-
-	} else {
-		errstr = g_strdup_printf("unable to make directory %s", dir);
-		error(errstr);
-		g_free(errstr);
-
-	}
-
-	g_free(dir);
 }
 
 G_MODULE_EXPORT void

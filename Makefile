@@ -1,8 +1,8 @@
 planner: planner.o
-	gcc -g -o planner planner.o `pkg-config --libs gtk+-2.0` -Wl,--export-dynamic
+	gcc -g -o planner planner.o `pkg-config --libs gtk+-3.0` -Wl,--export-dynamic
 
 planner.o: planner.c planner_ui.h
-	gcc -g -c planner.c `pkg-config --cflags gtk+-2.0`
+	gcc -g -c planner.c `pkg-config --cflags gtk+-3.0`
 
 planner_ui.h: makedoth
 	./makedoth planner.ui planner_ui.h
