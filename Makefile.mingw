@@ -1,14 +1,8 @@
 planner.exe: planner.o
 	gcc -g -o planner.exe planner.o `pkg-config --libs gtk+-2.0`
 
-planner.o: planner.c planner_ui.h
+planner.o: planner.c 
 	gcc -g -c planner.c `pkg-config --cflags gtk+-2.0`
 
-planner_ui.h: makedoth.exe
-	./makedoth.exe planner.ui planner_ui.h
-
-makedoth.exe: makedoth.c
-	gcc -g -o makedoth makedoth.c
-
 clean:
-	rm -f planner.o planner.exe makedoth.exe planner_ui.h
+	rm -f planner.o planner.exe 
