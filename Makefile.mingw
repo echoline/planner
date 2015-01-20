@@ -1,8 +1,8 @@
 planner.exe: planner.o
-	gcc -g -o planner.exe planner.o `pkg-config --libs gtk+-2.0`
+	i686-pc-mingw32-gcc -g -o planner.exe planner.o `pkg-config --libs gtk+-2.0`
 
 planner.o: planner.c 
-	gcc -g -c planner.c `pkg-config --cflags gtk+-2.0`
+	i686-pc-mingw32-gcc -g -c planner.c `pkg-config --cflags gtk+-2.0 gio-2.0`
 
 clean:
 	rm -f planner.o planner.exe 

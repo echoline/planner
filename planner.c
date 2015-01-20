@@ -8,6 +8,11 @@ gchar *path = NULL;
 gchar *dir = NULL;
 GtkWidget *window;
 
+typedef struct {
+	GtkTextView *notes;
+	GtkCalendar *calendar;
+} GtkStuff;
+
 void
 error(char *errstr) {
 	GtkWidget *dialog = gtk_message_dialog_new (
@@ -123,58 +128,62 @@ on_notes_key_release_event(GtkTextView *widget, gpointer unused) {
 	save(widget);
 }
 
-static gboolean
-on_draw (GtkWidget *widget, cairo_t *cr, gpointer user_data) {
-	cairo_set_source_rgba (cr, 1, 1, 1, 0.75);
-	cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
-	cairo_paint (cr);
+G_MODULE_EXPORT void
+on_today_clicked (GtkButton *widget, gpointer arg) {
+	GDate date;
+	GtkStuff *stuff = (GtkStuff*) (arg);
 
-	return FALSE;
+	g_date_set_time_t (&date, time (NULL));
+	gtk_calendar_select_month (stuff->calendar,
+				g_date_get_month (&date) - 1,
+				g_date_get_year (&date));
+	gtk_calendar_select_day (stuff->calendar,
+				g_date_get_day (&date));
+	on_calendar1_day_selected (stuff->calendar, stuff->notes);
 }
 
 int main(int argc, char **argv) {
-	GtkCalendar *calendar;
 	GError *error = NULL;
 	GdkScreen *screen;
 	GdkVisual *visual;
-	GtkWidget *notes;
 	GtkWidget *grid;
+	GtkWidget *tmp;
+	GtkStuff stuff;
+	GValue val = G_VALUE_INIT;
 
 	gtk_init(&argc, &argv);
 
 	window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
 	g_signal_connect (window, "destroy", gtk_main_quit, NULL);
+	gtk_window_set_resizable (GTK_WINDOW (window), 0);
 
-	gtk_widget_set_app_paintable (window, TRUE);
-	screen = gdk_screen_get_default ();
-	visual = gdk_screen_get_rgba_visual (screen);
-	if (visual != NULL && gdk_screen_is_composited (screen)) {
-		gtk_widget_set_visual (window, visual);
-	}
-	
 	grid = gtk_grid_new ();
 	gtk_container_add (GTK_CONTAINER (window), grid);
 
-	notes = gtk_text_view_new ();
-	gtk_widget_set_size_request (notes, 120, -1);
-	gtk_widget_set_hexpand (notes, TRUE);
-	gtk_widget_set_vexpand (notes, TRUE);
-	g_signal_connect (notes, "draw", G_CALLBACK(on_draw), NULL);
-	g_signal_connect (notes, "paste-clipboard", G_CALLBACK(on_notes_paste_clipboard), NULL);
-	g_signal_connect (notes, "key-release-event", G_CALLBACK(on_notes_key_release_event), NULL);
-	gtk_grid_attach (GTK_GRID (grid), notes, 1, 0, 1, 1);
+	stuff.notes = GTK_TEXT_VIEW (gtk_text_view_new ());
+	g_signal_connect (stuff.notes, "paste-clipboard", G_CALLBACK(on_notes_paste_clipboard), NULL);
+	g_signal_connect (stuff.notes, "key-release-event", G_CALLBACK(on_notes_key_release_event), NULL);
 
 	gtk_window_set_icon_name((GtkWindow*)window, "gtk-yes");
 
-	calendar = GTK_CALENDAR (gtk_calendar_new ());
-	gtk_widget_set_hexpand (GTK_WIDGET (calendar), FALSE);
-	gtk_widget_set_vexpand (GTK_WIDGET (calendar), TRUE);
-	gtk_calendar_set_detail_func(calendar, &details, NULL, NULL);
-	gtk_calendar_set_detail_width_chars(calendar, 3);
-	gtk_calendar_set_detail_height_rows(calendar, 1);
-	on_calendar1_day_selected(calendar, notes);
-	g_signal_connect (calendar, "day-selected", G_CALLBACK(on_calendar1_day_selected), notes);
-	gtk_grid_attach (GTK_GRID (grid), GTK_WIDGET (calendar), 0, 0, 1, 1);
+	stuff.calendar = GTK_CALENDAR (gtk_calendar_new ());
+	gtk_calendar_set_detail_func(stuff.calendar, &details, NULL, NULL);
+	gtk_calendar_set_detail_width_chars(stuff.calendar, 3);
+	gtk_calendar_set_detail_height_rows(stuff.calendar, 1);
+	on_calendar1_day_selected(stuff.calendar, (gpointer)stuff.notes);
+	g_signal_connect (stuff.calendar, "day-selected", G_CALLBACK(on_calendar1_day_selected), stuff.notes);
+	gtk_grid_attach (GTK_GRID (grid), GTK_WIDGET (stuff.calendar), 0, 0, 1, 10);
+
+	tmp = gtk_button_new_with_label ("Today");
+	gtk_grid_attach (GTK_GRID (grid), GTK_WIDGET (tmp), 1, 0, 1, 1);
+	g_signal_connect (tmp, "clicked", (GCallback)on_today_clicked, &stuff);
+
+	tmp = gtk_scrolled_window_new (NULL, NULL);
+	g_value_init (&val, G_TYPE_INT);
+	g_value_set_int (&val, 240);
+	g_object_set_property (G_OBJECT (tmp), "width-request", &val);
+	gtk_container_add (GTK_CONTAINER (tmp), GTK_WIDGET (stuff.notes));
+	gtk_grid_attach (GTK_GRID (grid), GTK_WIDGET (tmp), 1, 1, 1, 9);
 
 	gtk_window_set_title((GtkWindow*)window, "Planner");
 
