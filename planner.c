@@ -142,6 +142,15 @@ on_today_clicked (GtkButton *widget, gpointer arg) {
 	on_calendar1_day_selected (stuff->calendar, stuff->notes);
 }
 
+static gboolean
+on_draw_notes (GtkWidget *widget, cairo_t *cr, gpointer __unused) {
+	cairo_set_source_rgba (cr, 1, 1, 1, 0.85);
+	cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
+	cairo_paint (cr);
+
+	return FALSE;
+}
+
 int main(int argc, char **argv) {
 	GError *error = NULL;
 	GdkScreen *screen;
@@ -160,7 +169,14 @@ int main(int argc, char **argv) {
 	grid = gtk_grid_new ();
 	gtk_container_add (GTK_CONTAINER (window), grid);
 
+	screen = gdk_screen_get_default ();
+	visual = gdk_screen_get_rgba_visual (screen);
+	if (visual != NULL && gdk_screen_is_composited (screen)) {
+		gtk_widget_set_visual (window, visual);
+	}
+
 	stuff.notes = GTK_TEXT_VIEW (gtk_text_view_new ());
+	g_signal_connect (stuff.notes, "draw", G_CALLBACK(on_draw_notes), NULL);
 	g_signal_connect (stuff.notes, "paste-clipboard", G_CALLBACK(on_notes_paste_clipboard), NULL);
 	g_signal_connect (stuff.notes, "key-release-event", G_CALLBACK(on_notes_key_release_event), NULL);
 
@@ -172,10 +188,10 @@ int main(int argc, char **argv) {
 	gtk_calendar_set_detail_height_rows(stuff.calendar, 1);
 	on_calendar1_day_selected(stuff.calendar, (gpointer)stuff.notes);
 	g_signal_connect (stuff.calendar, "day-selected", G_CALLBACK(on_calendar1_day_selected), stuff.notes);
-	gtk_grid_attach (GTK_GRID (grid), GTK_WIDGET (stuff.calendar), 0, 0, 1, 10);
+	gtk_grid_attach (GTK_GRID (grid), GTK_WIDGET (stuff.calendar), 0, 1, 1, 9);
 
 	tmp = gtk_button_new_with_label ("Today");
-	gtk_grid_attach (GTK_GRID (grid), GTK_WIDGET (tmp), 1, 0, 1, 1);
+	gtk_grid_attach (GTK_GRID (grid), GTK_WIDGET (tmp), 0, 0, 1, 1);
 	g_signal_connect (tmp, "clicked", (GCallback)on_today_clicked, &stuff);
 
 	tmp = gtk_scrolled_window_new (NULL, NULL);
@@ -183,7 +199,7 @@ int main(int argc, char **argv) {
 	g_value_set_int (&val, 240);
 	g_object_set_property (G_OBJECT (tmp), "width-request", &val);
 	gtk_container_add (GTK_CONTAINER (tmp), GTK_WIDGET (stuff.notes));
-	gtk_grid_attach (GTK_GRID (grid), GTK_WIDGET (tmp), 1, 1, 1, 9);
+	gtk_grid_attach (GTK_GRID (grid), GTK_WIDGET (tmp), 1, 0, 1, 10);
 
 	gtk_window_set_title((GtkWindow*)window, "Planner");
 
