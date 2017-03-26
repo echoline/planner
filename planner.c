@@ -103,8 +103,9 @@ G_MODULE_EXPORT void
 on_calendar1_day_selected(GtkCalendar *widget, gpointer arg) {
 	guint year, month, day;
 	gchar *errstr;
+	GtkStuff *stuff = (GtkStuff*)arg;
 
-	gtk_calendar_get_date(widget, &year, &month, &day);
+	gtk_calendar_get_date(stuff->calendar, &year, &month, &day);
 
 	if (path != NULL)
 		g_free(path);
@@ -114,17 +115,17 @@ on_calendar1_day_selected(GtkCalendar *widget, gpointer arg) {
 
 	dir = makepath(year, month, day);
 	path = g_strconcat(dir, "index.txt", NULL);
-	load(arg);
+	load(stuff->notes);
 
 }
 
 G_MODULE_EXPORT void
-on_notes_paste_clipboard(GtkTextView *widget, gpointer unused) {
+on_notes_paste_clipboard(GtkTextView *widget, gpointer arg) {
 	save(widget);
 }
 
 G_MODULE_EXPORT void
-on_notes_key_release_event(GtkTextView *widget, gpointer unused) {
+on_notes_key_release_event(GtkTextView *widget, gpointer arg) {
 	save(widget);
 }
 
@@ -139,7 +140,7 @@ on_today_clicked (GtkButton *widget, gpointer arg) {
 				g_date_get_year (&date));
 	gtk_calendar_select_day (stuff->calendar,
 				g_date_get_day (&date));
-	on_calendar1_day_selected (stuff->calendar, stuff->notes);
+	on_calendar1_day_selected (stuff->calendar, stuff);
 }
 
 static gboolean
@@ -157,7 +158,7 @@ int main(int argc, char **argv) {
 	GdkVisual *visual;
 	GtkWidget *grid;
 	GtkWidget *tmp;
-	GtkStuff stuff;
+	GtkStuff *stuff = calloc(1, sizeof(GtkStuff));
 	GValue val = G_VALUE_INIT;
 
 	gtk_init(&argc, &argv);
@@ -175,30 +176,31 @@ int main(int argc, char **argv) {
 		gtk_widget_set_visual (window, visual);
 	}
 
-	stuff.notes = GTK_TEXT_VIEW (gtk_text_view_new ());
-	g_signal_connect (stuff.notes, "draw", G_CALLBACK(on_draw_notes), NULL);
-	g_signal_connect (stuff.notes, "paste-clipboard", G_CALLBACK(on_notes_paste_clipboard), NULL);
-	g_signal_connect (stuff.notes, "key-release-event", G_CALLBACK(on_notes_key_release_event), NULL);
+	stuff->notes = GTK_TEXT_VIEW (gtk_text_view_new ());
+	gtk_text_view_set_wrap_mode (stuff->notes, GTK_WRAP_WORD);
+	//g_signal_connect (stuff.notes, "draw", G_CALLBACK(on_draw_notes), NULL);
+	g_signal_connect (stuff->notes, "paste-clipboard", G_CALLBACK(on_notes_paste_clipboard), stuff);
+	g_signal_connect (stuff->notes, "key-release-event", G_CALLBACK(on_notes_key_release_event), stuff);
 
 	gtk_window_set_icon_name((GtkWindow*)window, "gtk-yes");
 
-	stuff.calendar = GTK_CALENDAR (gtk_calendar_new ());
-	gtk_calendar_set_detail_func(stuff.calendar, &details, NULL, NULL);
-	gtk_calendar_set_detail_width_chars(stuff.calendar, 3);
-	gtk_calendar_set_detail_height_rows(stuff.calendar, 1);
-	on_calendar1_day_selected(stuff.calendar, (gpointer)stuff.notes);
-	g_signal_connect (stuff.calendar, "day-selected", G_CALLBACK(on_calendar1_day_selected), stuff.notes);
-	gtk_grid_attach (GTK_GRID (grid), GTK_WIDGET (stuff.calendar), 0, 1, 1, 9);
+	stuff->calendar = GTK_CALENDAR (gtk_calendar_new ());
+	gtk_calendar_set_detail_func(stuff->calendar, &details, NULL, NULL);
+	gtk_calendar_set_detail_width_chars(stuff->calendar, 3);
+	gtk_calendar_set_detail_height_rows(stuff->calendar, 1);
+	on_calendar1_day_selected(stuff->calendar, stuff);
+	g_signal_connect (stuff->calendar, "day-selected", G_CALLBACK(on_calendar1_day_selected), stuff);
+	gtk_grid_attach (GTK_GRID (grid), GTK_WIDGET (stuff->calendar), 0, 1, 1, 9);
 
 	tmp = gtk_button_new_with_label ("Today");
 	gtk_grid_attach (GTK_GRID (grid), GTK_WIDGET (tmp), 0, 0, 1, 1);
-	g_signal_connect (tmp, "clicked", (GCallback)on_today_clicked, &stuff);
+	g_signal_connect (tmp, "clicked", (GCallback)on_today_clicked, stuff);
 
 	tmp = gtk_scrolled_window_new (NULL, NULL);
 	g_value_init (&val, G_TYPE_INT);
 	g_value_set_int (&val, 240);
 	g_object_set_property (G_OBJECT (tmp), "width-request", &val);
-	gtk_container_add (GTK_CONTAINER (tmp), GTK_WIDGET (stuff.notes));
+	gtk_container_add (GTK_CONTAINER (tmp), GTK_WIDGET (stuff->notes));
 	gtk_grid_attach (GTK_GRID (grid), GTK_WIDGET (tmp), 1, 0, 1, 10);
 
 	gtk_window_set_title((GtkWindow*)window, "Planner");
