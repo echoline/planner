@@ -143,19 +143,19 @@ on_today_clicked (GtkButton *widget, gpointer arg) {
 	on_calendar1_day_selected (stuff->calendar, stuff);
 }
 
-static gboolean
+/*static gboolean
 on_draw_notes (GtkWidget *widget, cairo_t *cr, gpointer __unused) {
 	cairo_set_source_rgba (cr, 1, 1, 1, 0.85);
 	cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
 	cairo_paint (cr);
 
 	return FALSE;
-}
+}*/
 
 int main(int argc, char **argv) {
 	GError *error = NULL;
 	GdkScreen *screen;
-	GdkVisual *visual;
+//	GdkVisual *visual;
 	GtkWidget *grid;
 	GtkWidget *tmp;
 	GtkStuff *stuff = calloc(1, sizeof(GtkStuff));
@@ -170,15 +170,15 @@ int main(int argc, char **argv) {
 	grid = gtk_grid_new ();
 	gtk_container_add (GTK_CONTAINER (window), grid);
 
-	screen = gdk_screen_get_default ();
+/*	screen = gdk_screen_get_default ();
 	visual = gdk_screen_get_rgba_visual (screen);
 	if (visual != NULL && gdk_screen_is_composited (screen)) {
 		gtk_widget_set_visual (window, visual);
-	}
+	}*/
 
 	stuff->notes = GTK_TEXT_VIEW (gtk_text_view_new ());
 	gtk_text_view_set_wrap_mode (stuff->notes, GTK_WRAP_WORD);
-	//g_signal_connect (stuff.notes, "draw", G_CALLBACK(on_draw_notes), NULL);
+	//g_signal_connect (stuff->notes, "draw", G_CALLBACK(on_draw_notes), NULL);
 	g_signal_connect (stuff->notes, "paste-clipboard", G_CALLBACK(on_notes_paste_clipboard), stuff);
 	g_signal_connect (stuff->notes, "key-release-event", G_CALLBACK(on_notes_key_release_event), stuff);
 
