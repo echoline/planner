@@ -122,11 +122,13 @@ on_calendar1_day_selected(GtkCalendar *widget, gpointer arg) {
 G_MODULE_EXPORT void
 on_notes_paste_clipboard(GtkTextView *widget, gpointer arg) {
 	save(widget);
+	gtk_widget_queue_draw(GTK_WIDGET(((GtkStuff*)arg)->calendar));
 }
 
 G_MODULE_EXPORT void
-on_notes_key_release_event(GtkTextView *widget, gpointer arg) {
+on_notes_key_release_event(GtkTextView *widget, GdkEvent *event, gpointer arg) {
 	save(widget);
+	gtk_widget_queue_draw(GTK_WIDGET(((GtkStuff*)arg)->calendar));
 }
 
 G_MODULE_EXPORT void
