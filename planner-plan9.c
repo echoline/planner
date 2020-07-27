@@ -23,12 +23,30 @@ Keyboardctl *kc;
 Rune *contents = nil;
 int contentslen = 0;
 
+void*
+emalloc(unsigned int n)
+{
+	void *p;
+
+	p = malloc(n);
+	if (p == nil) {
+		fprint(2, "planner: malloc failed: %r\n");
+		closekeyboard(kc);
+		closemouse(mc);
+		lockdisplay(display);
+		closedisplay(display);
+		exits("malloc");
+	}
+
+	return p;
+}
+
 void
-updatetoday(Image *screen)
+updateday(Image *screen)
 {
 	int x, y;
 	int mday;
-	char *buf = malloc(BUFLEN);
+	char *buf = emalloc(BUFLEN);
 	int fd;
 	Tm *tm = localtime(t);
 	int year = tm->year + 1900;
@@ -68,7 +86,7 @@ updateall(Image *screen)
 	int height = Dy(screen->r) > 512? 512: Dy(screen->r);
 	int half = Dx(screen->r)/2;
 	int x, y;
-	char *buf = malloc(BUFLEN);
+	char *buf = emalloc(BUFLEN);
 	int year;
 	int wdaystart;
 	int mday;
@@ -85,7 +103,7 @@ updateall(Image *screen)
 	Point monthsize;
 	Point yearsize;
 	Rectangle textr = Rpt(addpt(screen->r.min, Pt(half, 0)), screen->r.max);
-	Rune *runes = malloc(BUFLEN * sizeof(Rune));
+	Rune *runes = emalloc(BUFLEN * sizeof(Rune));
 
 	snprint(buf, BUFLEN-1, "%s/lib/plans", getenv("home"));
 	dir = dirstat(buf);
@@ -236,7 +254,7 @@ keyboardthread(void *)
 	int i, p;
 	int fd, w;
 	Tm *tm = localtime(t);
-	char *fname = malloc(BUFLEN);
+	char *fname = emalloc(BUFLEN);
 	int half;
 	Dir *dir;
 	Rectangle textr;
@@ -277,7 +295,7 @@ keyboardthread(void *)
 		}
 
 		lockdisplay(display);
-		buf = malloc(contentslen * UTFmax);
+		buf = emalloc(contentslen * UTFmax);
 		p = 0;
 		fd = 1;
 		for (i = 0; i < contentslen; i++) {
@@ -333,7 +351,7 @@ keyboardthread(void *)
 			closedisplay(display);
 			exits("write");
 		}
-		updatetoday(screen);
+		updateday(screen);
 		flushimage(display, 1);
 		unlockdisplay(display);
 	}
@@ -348,14 +366,26 @@ threadmain(int argc, char **argv)
 	int half;
 	Rectangle textr;
 
-	buttons = malloc(5 * sizeof(Rectangle));
-	mdays = malloc(7 * sizeof(int*));
-	days = malloc(7 * sizeof(Rectangle*));
+	if(initdraw(0,0,"planner") < 0)
+		sysfatal("initdraw: %r");
+	back = allocimagemix(display, DGreen, DWhite);
+	mc = initmouse(nil, screen);
+	if (mc == nil)
+		sysfatal("initmouse: %r");
+	kc = initkeyboard(nil);
+	if (kc == nil)
+		sysfatal("initkeyboard: %r");
+
+	display->locking = 1;
+
+	buttons = emalloc(5 * sizeof(Rectangle));
+	mdays = emalloc(7 * sizeof(int*));
+	days = emalloc(7 * sizeof(Rectangle*));
 	for (x = 0; x < 7; x++) {
-		mdays[x] = malloc(6 * sizeof(int));
-		days[x] = malloc(6 * sizeof(Rectangle));
+		mdays[x] = emalloc(6 * sizeof(int));
+		days[x] = emalloc(6 * sizeof(Rectangle));
 	}
-	monthlens = malloc(12 * sizeof(int));
+	monthlens = emalloc(12 * sizeof(int));
 	monthlens[0] = 31;
 	monthlens[1] = 28;
 	monthlens[2] = 31;
@@ -368,16 +398,6 @@ threadmain(int argc, char **argv)
 	monthlens[9] = 31;
 	monthlens[10] = 30;
 	monthlens[11] = 31;
-
-	if(initdraw(0,0,"planner") < 0)
-		sysfatal("initdraw: %r");
-	back = allocimagemix(display, DGreen, DWhite);
-	mc = initmouse(nil, screen);
-	if (mc == nil)
-		sysfatal("initmouse: %r");
-	kc = initkeyboard(nil);
-	if (kc == nil)
-		sysfatal("initkeyboard: %r");
 
 	half = Dx(screen->r)/2;
 	t = time(nil);
@@ -393,7 +413,6 @@ threadmain(int argc, char **argv)
 
 	threadcreate(resizethread, nil, mainstacksize);
 	threadcreate(keyboardthread, nil, mainstacksize);
-	display->locking = 1;
 	updateall(screen);
 	unlockdisplay(display);
 
