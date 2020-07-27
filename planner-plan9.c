@@ -237,11 +237,14 @@ keyboardthread(void *)
 	int fd, w;
 	Tm *tm = localtime(t);
 	char *fname = malloc(BUFLEN);
-	int half = Dx(screen->r)/2;
+	int half;
 	Dir *dir;
-	Rectangle textr = Rpt(addpt(screen->r.min, Pt(half, 0)), screen->r.max);
+	Rectangle textr;
 
 	while(recv(kc->c, r) > 0){
+		half = Dx(screen->r)/2;
+		textr = Rpt(addpt(screen->r.min, Pt(half, 0)), screen->r.max);
+
 		if (r[0] == 127){
 			closekeyboard(kc);
 			closemouse(mc);
@@ -266,10 +269,11 @@ keyboardthread(void *)
 				frdelete(text, text->p0, text->p1);
 			}
 
-			frinsert(text, &r[0], &r[1], text->p1);
 			contentslen++;
 			contents = realloc(contents, contentslen * sizeof(Rune));
-			contents[contentslen-1] = r[0];
+			memmove(&contents[text->p1 + 1], &contents[text->p1], (contentslen - text->p1 - 1) * sizeof(Rune));
+			contents[text->p1] = r[0];
+			frinsert(text, &r[0], &r[1], text->p1);
 		}
 
 		lockdisplay(display);
@@ -459,6 +463,7 @@ threadmain(int argc, char **argv)
 			}
 		}
 
+		half = Dx(screen->r)/2;
 		textr = Rpt(Pt(screen->r.min.x + half, screen->r.min.y), screen->r.max);
 		if (ptinrect(m.xy, textr))
 			frselect(text, mc);
