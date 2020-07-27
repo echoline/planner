@@ -17,7 +17,6 @@ int monthday = 0;
 Rectangle *buttons;
 int isleap = 0;
 Frame *text;
-Image *texti;
 Image *cols[NCOL];
 Mousectl *mc;
 Keyboardctl *kc;
@@ -85,7 +84,7 @@ updateall(Image *screen)
 	Point movesize;
 	Point monthsize;
 	Point yearsize;
-	Rectangle textr;
+	Rectangle textr = Rpt(addpt(screen->r.min, Pt(half, 0)), screen->r.max);
 	Rune *runes = malloc(BUFLEN * sizeof(Rune));
 
 	snprint(buf, BUFLEN-1, "%s/lib/plans", getenv("home"));
@@ -109,7 +108,7 @@ updateall(Image *screen)
 
 	todaysize = stringsize(display->defaultfont, "Today");
 	movesize = stringsize(display->defaultfont, "<<");
-	monthsize = stringsize(display->defaultfont, months[tm->mon]);
+	monthsize = stringsize(display->defaultfont, "September"); // longest month name in any font hopefully
 	year = tm->year + 1900;
 	monthlens[1] = 28;
 	isleap = (year % 4 == 0) && ((year % 100 != 0) || (year % 400 == 0));
@@ -142,8 +141,8 @@ updateall(Image *screen)
 	draw(screen, screen->r, back, nil, ZP);
 
 	frclear(text, 0);
-	draw(texti, texti->r, display->white, nil, ZP);
-	frinit(text, text->entire, display->defaultfont, texti, cols);
+	draw(screen, textr, display->white, nil, ZP);
+	frinit(text, textr, display->defaultfont, screen, cols);
 	snprint(buf, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d/index.txt", getenv("home"), year, tm->mon+1, tm->mday);
 	contentslen = 0;
 	fd = open(buf, OREAD);
@@ -160,7 +159,6 @@ updateall(Image *screen)
 		}
 		close(fd);
 	}
-	draw(screen, Rpt(addpt(screen->r.min, Pt(half, 0)), screen->r.max), texti, nil, ZP);
 
 	snprint(buf, BUFLEN-1, "%d", year);
 	draw(screen, buttons[0], display->white, nil, ZP);
@@ -241,6 +239,7 @@ keyboardthread(void *)
 	char *fname = malloc(BUFLEN);
 	int half = Dx(screen->r)/2;
 	Dir *dir;
+	Rectangle textr = Rpt(addpt(screen->r.min, Pt(half, 0)), screen->r.max);
 
 	while(recv(kc->c, r) > 0){
 		if (r[0] == 127){
@@ -254,15 +253,19 @@ keyboardthread(void *)
 		} else if (r[0] == 8) {
 			if (text->p1 == 0)
 				continue;
-			if (text->p0 == text->p1) {
-				frdelete(text, text->p1 - 1, text->p1);
-				contentslen--;
-			} else {
-				frdelete(text, text->p0, text->p1);
-				memmove(&contents[text->p0], &contents[text->p1], (text->p1 - text->p0) * sizeof(Rune));
-				contentslen -= text->p1 - text->p0;
-			}
+			if (text->p0 == text->p1)
+				text->p0--;
+
+			memmove(&contents[text->p0], &contents[text->p1], (contentslen - text->p1) * sizeof(Rune));
+			contentslen -= text->p1 - text->p0;
+			frdelete(text, text->p0, text->p1);
 		} else {
+			if (text->p0 != text->p1) {
+				memmove(&contents[text->p0], &contents[text->p1], (contentslen - text->p1) * sizeof(Rune));
+				contentslen -= text->p1 - text->p0;
+				frdelete(text, text->p0, text->p1);
+			}
+
 			frinsert(text, &r[0], &r[1], text->p1);
 			contentslen++;
 			contents = realloc(contents, contentslen * sizeof(Rune));
@@ -270,7 +273,6 @@ keyboardthread(void *)
 		}
 
 		lockdisplay(display);
-		draw(screen, Rpt(addpt(screen->r.min, Pt(half, 0)), screen->r.max), texti, nil, ZP);
 		buf = malloc(contentslen * UTFmax);
 		p = 0;
 		fd = 1;
@@ -381,11 +383,9 @@ threadmain(int argc, char **argv)
 	cols[HIGH] = display->black;
 	cols[HTEXT] = display->white;
 	cols[BORD] = display->black;
-	text = malloc(sizeof(Frame));
-	memset(text, 0, sizeof(Frame));
-	textr = Rect(0, 0, half, Dy(screen->r));
-	texti = allocimage(display, textr, CMAP8, 1, 0xFFFFFFFF);
-	frinit(text, textr, display->defaultfont, texti, cols);
+	text = calloc(1, sizeof(Frame));
+	textr = Rpt(addpt(screen->r.min, Pt(half, 0)), screen->r.max);
+	frinit(text, textr, display->defaultfont, screen, cols);
 
 	threadcreate(resizethread, nil, mainstacksize);
 	threadcreate(keyboardthread, nil, mainstacksize);
@@ -458,5 +458,9 @@ threadmain(int argc, char **argv)
 				}
 			}
 		}
+
+		textr = Rpt(Pt(screen->r.min.x + half, screen->r.min.y), screen->r.max);
+		if (ptinrect(m.xy, textr))
+			frselect(text, mc);
 	}
 }
