@@ -1,0 +1,17 @@
+#!/bin/rc
+
+for (y in $home/lib/plans/[0-9][0-9][0-9][0-9]) {
+	Y=`{basename $y | sed 's/^0*//'}
+
+	for (m in $y/[0-1][0-9]) {
+		M=`{basename $m | sed 's/^0*//'}
+
+		for (d in $m/[0-3][0-9]) {
+			D=`{basename $d | sed 's/^0*//'}
+
+			if (test -f $d/index.txt) {
+				awk '{ print "'^$M^'/'^$D^' '^$Y^' " $0 }' $d/index.txt
+			}
+		}
+	}
+}
