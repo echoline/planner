@@ -534,18 +534,9 @@ threadmain(int argc, char **argv)
 		daybuttons[x] = emalloc(6 * sizeof(Rectangle));
 	}
 	monthlens = emalloc(12 * sizeof(int));
-	monthlens[0] = 31;
+	monthlens[8] = monthlens[3] = monthlens[5] = monthlens[10] = 30;
+	monthlens[0] = monthlens[2] = monthlens[4] = monthlens[6] = monthlens[7] = monthlens[9] = monthlens[11] = 31;
 	monthlens[1] = 28;
-	monthlens[2] = 31;
-	monthlens[3] = 30;
-	monthlens[4] = 31;
-	monthlens[5] = 30;
-	monthlens[6] = 31;
-	monthlens[7] = 31;
-	monthlens[8] = 30;
-	monthlens[9] = 31;
-	monthlens[10] = 30;
-	monthlens[11] = 31;
 
 	half = Dx(screen->r)/2;
 	t = time(nil);
