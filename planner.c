@@ -7,6 +7,7 @@
 gchar *path = NULL;
 gchar *dir = NULL;
 GtkWidget *window;
+gchar loading = 0;
 
 typedef struct {
 	GtkTextView *notes;
@@ -52,10 +53,15 @@ details(GtkCalendar *calendar, guint year, guint month, guint day, gpointer user
 }
 
 void
-save(GtkTextView *widget) {
-	GtkTextBuffer *buffer;
+save(GtkTextBuffer *buffer) {
 	GtkTextIter start, end;
 	gchar *text, *errstr;
+
+	// don't save on load
+	if (loading == 1) {
+		loading = 0;
+		return;
+	}
 
 	if (g_mkdir_with_parents(dir, 0700) != 0) {
 		errstr = g_strdup_printf("unable to make directory %s", dir);
@@ -64,7 +70,6 @@ save(GtkTextView *widget) {
 
 	}
 
-	buffer = gtk_text_view_get_buffer(widget);
 	gtk_text_buffer_get_start_iter(buffer, &start);
 	gtk_text_buffer_get_end_iter(buffer, &end);
 	text = gtk_text_buffer_get_slice(buffer, &start, &end, TRUE);
@@ -93,6 +98,7 @@ load(GtkTextView *widget) {
 		text = g_strdup("");
 	}
 
+	loading = 1;
 	buffer = gtk_text_view_get_buffer(widget);
 	gtk_text_buffer_set_text(buffer, text, length);
 
@@ -120,13 +126,7 @@ on_calendar1_day_selected(GtkCalendar *widget, gpointer arg) {
 }
 
 G_MODULE_EXPORT void
-on_notes_paste_clipboard(GtkTextView *widget, gpointer arg) {
-	save(widget);
-	gtk_widget_queue_draw(GTK_WIDGET(((GtkStuff*)arg)->calendar));
-}
-
-G_MODULE_EXPORT void
-on_notes_key_release_event(GtkTextView *widget, GdkEvent *event, gpointer arg) {
+on_notes_changed(GtkTextBuffer *widget, gpointer arg) {
 	save(widget);
 	gtk_widget_queue_draw(GTK_WIDGET(((GtkStuff*)arg)->calendar));
 }
@@ -145,19 +145,8 @@ on_today_clicked (GtkButton *widget, gpointer arg) {
 	on_calendar1_day_selected (stuff->calendar, stuff);
 }
 
-/*static gboolean
-on_draw_notes (GtkWidget *widget, cairo_t *cr, gpointer __unused) {
-	cairo_set_source_rgba (cr, 1, 1, 1, 0.85);
-	cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
-	cairo_paint (cr);
-
-	return FALSE;
-}*/
-
 int main(int argc, char **argv) {
 	GError *error = NULL;
-	GdkScreen *screen;
-//	GdkVisual *visual;
 	GtkWidget *grid;
 	GtkWidget *tmp;
 	GtkStuff *stuff = calloc(1, sizeof(GtkStuff));
@@ -172,17 +161,9 @@ int main(int argc, char **argv) {
 	grid = gtk_grid_new ();
 	gtk_container_add (GTK_CONTAINER (window), grid);
 
-/*	screen = gdk_screen_get_default ();
-	visual = gdk_screen_get_rgba_visual (screen);
-	if (visual != NULL && gdk_screen_is_composited (screen)) {
-		gtk_widget_set_visual (window, visual);
-	}*/
-
 	stuff->notes = GTK_TEXT_VIEW (gtk_text_view_new ());
 	gtk_text_view_set_wrap_mode (stuff->notes, GTK_WRAP_WORD);
-	//g_signal_connect (stuff->notes, "draw", G_CALLBACK(on_draw_notes), NULL);
-	g_signal_connect (stuff->notes, "paste-clipboard", G_CALLBACK(on_notes_paste_clipboard), stuff);
-	g_signal_connect (stuff->notes, "key-release-event", G_CALLBACK(on_notes_key_release_event), stuff);
+	g_signal_connect (gtk_text_view_get_buffer(stuff->notes), "changed", G_CALLBACK(on_notes_changed), stuff);
 
 	gtk_window_set_icon_name((GtkWindow*)window, "gtk-yes");
 
