@@ -21,7 +21,6 @@ Mousectl *mc;
 Keyboardctl *kc;
 Rune *contents = nil;
 int contentslen = 0;
-Channel *savec;
 
 void
 exitall(char *arg)
@@ -250,20 +249,6 @@ resizethread(void *)
 void save(void);
 
 void
-savethread(void*)
-{
-	ulong dummy;
-	ulong last = time(nil);
-
-	while(recv(savec, &dummy) > 0){
-		if (last < (time(nil) - 3)) {
-			save();
-			last = time(nil);
-		}
-	}
-}
-
-void
 keyboardthread(void *)
 {
 	Rune r[2];
@@ -349,7 +334,7 @@ keyboardthread(void *)
 		}
 
 		flushimage(display, 1);
-		send(savec, &dummy);
+		save();
 	}
 }
 
@@ -528,18 +513,13 @@ threadmain(int argc, char **argv)
 	textr = Rpt(addpt(screen->r.min, Pt(half, 0)), screen->r.max);
 	frinit(text, textr, display->defaultfont, screen, cols);
 
-	savec = chancreate(sizeof(ulong), 1);
-
 	threadcreate(resizethread, nil, mainstacksize);
 	threadcreate(keyboardthread, nil, mainstacksize);
-	threadcreate(savethread, nil, mainstacksize);
 	updateall(screen);
 
 	menu.item = mstr;
 	menu.lasthit = 0;
 	while(recv(mc->c, &m) >= 0) {
-		send(savec, &dummy);
-
 		if (m.buttons & 4) {
 			x = menuhit(3, mc, &menu, nil);
 			switch(x) {
@@ -550,8 +530,8 @@ threadmain(int argc, char **argv)
 				memmove(&contents[text->p0], &contents[text->p1], contentslen - text->p1);
 				contentslen -= text->p1 - text->p0;
 				frdelete(text, text->p0, text->p1);
-				send(savec, &dummy);
 				flushimage(display, 1);
+				save();
 				break;
 			case 1:
 				if (text->p0 == text->p1)
@@ -593,8 +573,8 @@ threadmain(int argc, char **argv)
 				else
 					frinsert(text, &contents[text->p1], &contents[text->p1 + l], text->p1);
 				close(fd);
-				send(savec, &dummy);
 				flushimage(display, 1);
+				save();
 				break;
 			case 3:
 				exitall(nil);
