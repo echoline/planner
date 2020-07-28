@@ -1,17 +1,11 @@
-//#include <u.h>
-//#include <libc.h>
-#define main __main
-#define emalloc __emalloc
-#define usage __usage
-#include "/sys/src/cmd/calendar.c"
+#include <u.h>
+#include <libc.h>
 #include <draw.h>
 #include <thread.h>
 #include <mouse.h>
 #include <frame.h>
 #include <keyboard.h>
-#undef emalloc
-#undef usage
-#define BUFLEN 8192
+#define BUFLEN 1024
 
 Image *back;
 Rectangle **daybuttons;
@@ -27,11 +21,7 @@ Mousectl *mc;
 Keyboardctl *kc;
 Rune *contents = nil;
 int contentslen = 0;
-char calendarformat = 0;
-char **calendarload;
-char **calendarsave;
-int calendarlines = 0;
-int calendarline = 0;
+Channel *keypressed;
 
 void*
 emalloc(unsigned int n)
@@ -112,27 +102,23 @@ updateall(Image *screen)
 	Point yearsize;
 	Rectangle textr = Rpt(addpt(screen->r.min, Pt(half, 0)), screen->r.max);
 	Rune *runes = emalloc(BUFLEN * sizeof(Rune));
-	Date *cur, *last;
-	char *line;
 
-	if (calendarformat == 0) {
-		snprint(buf, BUFLEN-1, "%s/lib/plans", getenv("home"));
-		dir = dirstat(buf);
-		if (dir == nil) {
-			fd = create(buf, OREAD, 0775L | DMDIR);
-		} else if(!(dir->mode & DMDIR)) {
-			fd = -1;
-		} else {
-			fd = open(buf, OREAD);
-		}
-		if (fd < 0) {
-			fprint(2, "error opening plans directory\n");
-			closekeyboard(kc);
-			closemouse(mc);
-			threadexitsall("error opening plans directory");
-		}
-		close(fd);
+	snprint(buf, BUFLEN-1, "%s/lib/plans", getenv("home"));
+	dir = dirstat(buf);
+	if (dir == nil) {
+		fd = create(buf, OREAD, 0775L | DMDIR);
+	} else if(!(dir->mode & DMDIR)) {
+		fd = -1;
+	} else {
+		fd = open(buf, OREAD);
 	}
+	if (fd < 0) {
+		fprint(2, "error opening plans directory\n");
+		closekeyboard(kc);
+		closemouse(mc);
+		threadexitsall("error opening plans directory");
+	}
+	close(fd);
 
 	todaysize = stringsize(display->defaultfont, "Today");
 	movesize = stringsize(display->defaultfont, "<<");
@@ -172,76 +158,21 @@ updateall(Image *screen)
 	draw(screen, textr, display->white, nil, ZP);
 	frinit(text, textr, display->defaultfont, screen, cols);
 	contentslen = 0;
-	if (calendarformat == 0) {
-		snprint(buf, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d/index.txt", getenv("home"), year, tm->mon+1, tm->mday);
-		fd = open(buf, OREAD);
-		if (fd > 0) {
-			while((r = read(fd, buf, BUFLEN-1)) > 0) {
-				for(x = 0, y = 0; x < r;) {
-					x += chartorune(&runes[y], &buf[x]);
-					y++;
-				}
-				frinsert(text, runes, &runes[y], text->p1);
-				contents = realloc(contents, (contentslen + y) * sizeof(Rune));
-				memcpy(contents, runes, y * sizeof(Rune));
-				contentslen += y;
+
+	snprint(buf, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d/index.txt", getenv("home"), year, tm->mon+1, tm->mday);
+	fd = open(buf, OREAD);
+	if (fd > 0) {
+		while((r = read(fd, buf, BUFLEN-1)) > 0) {
+			for(x = 0, y = 0; x < r;) {
+				x += chartorune(&runes[y], &buf[x]);
+				y++;
 			}
-			close(fd);
+			frinsert(text, runes, &runes[y], text->p1);
+			contents = realloc(contents, (contentslen + y) * sizeof(Rune));
+			memcpy(&contents[contentslen], runes, y * sizeof(Rune));
+			contentslen += y;
 		}
-	} else {
-		cur = Base;
-		while(cur != nil) {
-			last = cur;
-			free(cur->p);
-			cur = cur->next;
-			free(last);
-		}
-		Base = nil;
-		for(i = 0; calendarload[i] != nil; i++)
-			free(calendarload[i]);
-		for(i = 0; calendarsave[i] != nil; i++)
-			free(calendarsave[i]);
-		i = 0;
-		calendarlines = calendarline = 0;
-		calendarload[i] = nil;
-		calendarsave[i] = nil;
-		dates(tm);
-		snprint(buf, BUFLEN-1, "%s/lib/calendar", getenv("home"));
-		fd = open(buf, OREAD);
-		if (fd > 0) {
-			if (Binit(&in, fd, OREAD) >= 0) {
-				while(line = Brdline(&in, '\n')){
-					r = Blinelen(&in) - 1;
-					line[r] = 0;
-					upper2lower(buf, line, BUFLEN-1);
-					for(cur=Base; cur; cur=cur->next)
-						if(regexec(cur->p, buf, 0, 0)){
-							calendarload[i] = strdup(line);
-							calendarsave[i] = strdup(line);
-							calendarlines++;
-							calendarline++;
-							i++;
-							calendarload = realloc(calendarload, (i+1) * sizeof(char*));
-							calendarsave = realloc(calendarsave, (i+1) * sizeof(char*));
-							calendarload[i] = nil;
-							calendarsave[i] = nil;
-							for(x = 0, y = 0; x < r;) {
-								x += chartorune(&runes[y], &line[x]);
-								y++;
-							}
-							chartorune(&runes[y], "\n");
-							y++;
-							frinsert(text, runes, &runes[y], text->p1);
-							contents = realloc(contents, (contentslen + y) * sizeof(Rune));
-							memcpy(contents, runes, y * sizeof(Rune));
-							contentslen += y;
-							break;
-						}
-				}
-			}
-			Bterm(&in);
-			close(fd);
-		}
+		close(fd);
 	}
 
 	snprint(buf, BUFLEN-1, "%d", year);
@@ -277,19 +208,19 @@ updateall(Image *screen)
 				snprint(buf, BUFLEN-1, "%d", mday);
 				string(screen, daybuttons[x][y].min, mday == monthday? display->white: display->black, ZP, display->defaultfont, buf);
 				mdays[x][y] = mday;
-				if (calendarformat == 0) {
-					snprint(buf, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d/index.txt", getenv("home"), year, tm->mon+1, mday);
-					fd = open(buf, OREAD);
-					if (fd > 0) {
-						r = read(fd, buf, 3);
-						if (r > 0) {
-							buf[r] = '\0';
-							buf[strcspn(buf, "\r\n")] = '\0';
-							string(screen, addpt(daybuttons[x][y].min, Pt(0, todaysize.y)), mday == monthday? display->white: display->black, ZP, display->defaultfont, buf);
-						}
-						close(fd);
+
+				snprint(buf, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d/index.txt", getenv("home"), year, tm->mon+1, mday);
+				fd = open(buf, OREAD);
+				if (fd > 0) {
+					r = read(fd, buf, 3);
+					if (r > 0) {
+						buf[r] = '\0';
+						buf[strcspn(buf, "\r\n")] = '\0';
+						string(screen, addpt(daybuttons[x][y].min, Pt(0, todaysize.y)), mday == monthday? display->white: display->black, ZP, display->defaultfont, buf);
 					}
+					close(fd);
 				}
+
 				mday++;
 			}
 		}
@@ -315,12 +246,27 @@ resizethread(void *)
 void save(void);
 
 void
+savethread(void*)
+{
+	ulong dummy;
+	ulong last = time(nil);
+
+	while(recv(keypressed, &dummy) > 0){
+		if (last < (time(nil) - 3)) {
+			save();
+			last = time(nil);
+		}
+	}
+}
+
+void
 keyboardthread(void *)
 {
 	Rune r[2];
 	int half;
 	Rectangle textr;
 	int i, p, l, w;
+	ulong dummy = 1;
 
 	while(recv(kc->c, r) > 0){
 		half = Dx(screen->r)/2;
@@ -352,6 +298,8 @@ keyboardthread(void *)
 			text->p1--;
 			text->p0--;
 			frtick(text, frptofchar(text, text->p1), 1);
+			flushimage(display, 1);
+			continue;
 		} else if (r[0] == Kright && text->p1 == text->p0) {
 			if (text->p1 == text->nchars)
 				continue;
@@ -360,6 +308,8 @@ keyboardthread(void *)
 			text->p1++;
 			text->p0++;
 			frtick(text, frptofchar(text, text->p1), 1);
+			flushimage(display, 1);
+			continue;
 		} else if (r[0] == Kup && text->p1 == text->p0) {
 			for (p = text->p0, l = 0; p > 0 && contents[p-1] != L'\n'; p--, l++);
 			if (p == 0)
@@ -369,6 +319,8 @@ keyboardthread(void *)
 			frtick(text, frptofchar(text, text->p0), 0);
 			text->p0 = text->p1 = l > w? i + w: i + l;
 			frtick(text, frptofchar(text, text->p0), 1);
+			flushimage(display, 1);
+			continue;
 		} else if (r[0] == Kdown && text->p1 == text->p0) {
 			for (p = text->p0, l = 0; p > 0 && contents[p-1] != L'\n'; p--, l++);
 			for (p = text->p0; p < text->nchars && contents[p] != L'\n'; p++);
@@ -379,6 +331,8 @@ keyboardthread(void *)
 			frtick(text, frptofchar(text, text->p0), 0);
 			text->p0 = text->p1 = l > w? p + w + 1: p + l + 1;
 			frtick(text, frptofchar(text, text->p0), 1);
+			flushimage(display, 1);
+			continue;
 		} else {
 			if (text->p0 != text->p1) {
 				memmove(&contents[text->p0], &contents[text->p1], (contentslen - text->p1) * sizeof(Rune));
@@ -393,7 +347,8 @@ keyboardthread(void *)
 			frinsert(text, &r[0], &r[1], text->p1);
 		}
 
-		save();
+		flushimage(display, 1);
+		send(keypressed, &dummy);
 	}
 }
 
@@ -408,107 +363,64 @@ save(void)
 	Dir *dir;
 	Rune r[2];
 
-	if (calendarformat == 1) {
-		if (r[0] == L'\n') {
-			if (contents[contentslen-1] != L'\n') {
-				contentslen++;
-				contents = realloc(contents, contentslen * sizeof(Rune));
-				contents[contentslen-1] = L'\n';
-			}
-			calendarlines = 0;
-			for (i = 0; i < contentslen; i++)
-				if (contents[i] == 10)
-					calendarlines++;
-			calendarline = 0;
-			for (i = 0; i < text->p1; i++)
-				if (contents[i] == 10)
-					calendarline++;
-			calendarsave = realloc(calendarsave, (calendarlines+1) * sizeof(char*));
-			if (calendarlines == 1) {
-				calendarsave[0] = emalloc(runenlen(contents, contentslen));
-				p = 0;
-				for (i = 0; i < (contentslen-1); i++)
-					p += runetochar(&calendarsave[0][p], &contents[i]);
-				calendarsave[0][p] = '\0';
-				calendarsave[calendarlines] = nil;
-			} else {
-				memmove(&calendarsave[calendarline], &calendarsave[calendarline-1], (calendarlines - calendarline + 1) * sizeof(char*));
-				calendarsave[calendarline-1] = strdup(calendarsave[calendarline]);
-			}
-/*			for (p = text->p1, i = 0; p < text->nchars; p++, i++)
-				if (contents[p] == 10)
-					break;
-			l = runenlen(&contents[text->p1], i);
-			if (calendarsave[calendarline] != nil) {
-				memmove(calendarsave[calendarline], calendarsave[calendarline] + strlen(calendarsave[calendarline]) - l, l);
-				calendarsave[calendarline][l] = '\0';
-			} else {
-				calendarsave[calendarline] = strdup("");
-			}
-			calendarsave[calendarline-1][strlen(calendarsave[calendarline-1])-l] = '\0';*/
-			print("%s\n%s\n%s\n", calendarsave[calendarline-1], calendarsave[calendarline], calendarsave[calendarlines]);
-		}
-	} else {
-		buf = emalloc(contentslen * UTFmax);
-		p = 0;
-		fd = 1;
-		for (i = 0; i < contentslen; i++) {
-			w = runetochar(&buf[p], &contents[i]);
-			p += w;
-		}
-
-		tm = localtime(t);
-
-		snprint(fname, BUFLEN-1, "%s/lib/plans/%d", getenv("home"), tm->year + 1900);
-		dir = dirstat(fname);
-		if (dir == nil) {
-			fd = create(fname, OREAD, 0775L | DMDIR);
-			if (fd > 0) {
-				close(fd);
-			}
-		}
-		snprint(fname, BUFLEN-1, "%s/lib/plans/%d/%02d", getenv("home"), tm->year + 1900, tm->mon + 1);
-		dir = dirstat(fname);
-		if (fd > 0 && dir == nil) {
-			fd = create(fname, OREAD, 0775L | DMDIR);
-			if (fd > 0) {
-				close(fd);
-			}
-		}
-		snprint(fname, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d", getenv("home"), tm->year + 1900, tm->mon + 1, tm->mday);
-		dir = dirstat(fname);
-		if (fd > 0 && dir == nil) {
-			fd = create(fname, OREAD, 0775L | DMDIR);
-			if (fd > 0) {
-				close(fd);
-			}
-		}
-
-		if (dir != nil || fd > 0) {
-			snprint(fname, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d/index.txt", getenv("home"), tm->year + 1900, tm->mon + 1, tm->mday);
-			fd = create(fname, OWRITE, 0664L);
-			if (fd > 0) {
-				i = 0;
-				while (i < p) {
-					w = write(fd, buf + i, p - i);
-					if (w < 1)
-						break;
-					i += w;
-				}
-				close(fd);
-			}
-		}
-		free(buf);
-		if (fd < 0) {
-			fprint(2, "error saving file: %s\n", fname);
-			closekeyboard(kc);
-			closemouse(mc);
-			closedisplay(display);
-			threadexitsall("write");
-		}
-		updateday(screen);
-		flushimage(display, 1);
+	buf = emalloc(contentslen * UTFmax);
+	p = 0;
+	fd = 1;
+	for (i = 0; i < contentslen; i++) {
+		w = runetochar(&buf[p], &contents[i]);
+		p += w;
 	}
+
+	tm = localtime(t);
+
+	snprint(fname, BUFLEN-1, "%s/lib/plans/%d", getenv("home"), tm->year + 1900);
+	dir = dirstat(fname);
+	if (dir == nil) {
+		fd = create(fname, OREAD, 0775L | DMDIR);
+		if (fd > 0) {
+			close(fd);
+		}
+	}
+	snprint(fname, BUFLEN-1, "%s/lib/plans/%d/%02d", getenv("home"), tm->year + 1900, tm->mon + 1);
+	dir = dirstat(fname);
+	if (fd > 0 && dir == nil) {
+		fd = create(fname, OREAD, 0775L | DMDIR);
+		if (fd > 0) {
+			close(fd);
+		}
+	}
+	snprint(fname, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d", getenv("home"), tm->year + 1900, tm->mon + 1, tm->mday);
+	dir = dirstat(fname);
+	if (fd > 0 && dir == nil) {
+		fd = create(fname, OREAD, 0775L | DMDIR);
+		if (fd > 0) {
+			close(fd);
+		}
+	}
+
+	if (dir != nil || fd > 0) {
+		snprint(fname, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d/index.txt", getenv("home"), tm->year + 1900, tm->mon + 1, tm->mday);
+		fd = create(fname, OWRITE, 0664L);
+		if (fd > 0) {
+			i = 0;
+			while (i < p) {
+				w = write(fd, buf + i, p - i);
+				if (w < 1)
+					break;
+				i += w;
+			}
+			close(fd);
+		}
+	}
+	free(buf);
+	if (fd < 0) {
+		fprint(2, "error saving file: %s\n", fname);
+		closekeyboard(kc);
+		closemouse(mc);
+		threadexitsall("write");
+	}
+	updateday(screen);
+	flushimage(display, 1);
 	free(fname);
 }
 
@@ -523,23 +435,28 @@ void
 tosnarf(void)
 {
 	int fd = open("/dev/snarf", OWRITE);
-	char s[UTFmax];
-	char l;
+	char *buf = emalloc(BUFLEN);
+	int l;
 	int i, r, a;
 
 	if (fd < 0) {
 		fprint(2, "open /dev/snarf: %r\n");
+		free(buf);
 		return;
 	}
 
-	for (i = text->p0; i < text->p1; i++) {
-		l = runetochar(s, &contents[i]);
+	for (i = text->p0; i < text->p1;) {
 		a = 0;
-		while(l > 0) {
-			r = write(fd, s + a, l - a);
+		while(a < (BUFLEN-UTFmax) && i < text->p1) {
+			l = runetochar(buf + a, &contents[i++]);
+			a += l;
+		}
+		l = 0;
+		while(a > 0) {
+			r = write(fd, buf + l, a);
 			if (r > 0) {
-				a += r;
-				l -= r;
+				a -= r;
+				l += r;
 			} else {
 				fprint(2, "write: /dev/snarf: %r\n");
 			}
@@ -547,6 +464,7 @@ tosnarf(void)
 	}
 
 	close(fd);
+	free(buf);
 }
 
 void
@@ -560,19 +478,9 @@ threadmain(int argc, char **argv)
 	Menu menu;
 	char *mstr[] = {"cut", "snarf", "paste", "exit", 0};
 	int fd;
-	char s[UTFmax + 1];
+	char *buf;
 	int r, l, i;
-
-	ARGBEGIN{
-	case 'c':
-		calendarformat = 1;
-		matchyear = 1;
-		calendarload = calloc(1, sizeof(char*));
-		calendarsave = calloc(1, sizeof(char*));
-		break;
-	default:
-		usage();
-	}ARGEND;
+	ulong dummy = 1;
 
 	if(initdraw(0,0,"planner") < 0)
 		sysfatal("initdraw: %r");
@@ -607,6 +515,7 @@ threadmain(int argc, char **argv)
 
 	half = Dx(screen->r)/2;
 	t = time(nil);
+	buf = emalloc(BUFLEN);
 
 	cols[TEXT] = display->black;
 	cols[BACK] = display->white;
@@ -617,13 +526,18 @@ threadmain(int argc, char **argv)
 	textr = Rpt(addpt(screen->r.min, Pt(half, 0)), screen->r.max);
 	frinit(text, textr, display->defaultfont, screen, cols);
 
+	keypressed = chancreate(sizeof(ulong), 1);
+
 	threadcreate(resizethread, nil, mainstacksize);
 	threadcreate(keyboardthread, nil, mainstacksize);
+	threadcreate(savethread, nil, mainstacksize);
 	updateall(screen);
 
 	menu.item = mstr;
 	menu.lasthit = 0;
 	while(recv(mc->c, &m) >= 0) {
+		send(keypressed, &dummy);
+
 		if (m.buttons & 4) {
 			x = menuhit(3, mc, &menu, nil);
 			switch(x) {
@@ -634,7 +548,7 @@ threadmain(int argc, char **argv)
 				memmove(&contents[text->p0], &contents[text->p1], contentslen - text->p1);
 				contentslen -= text->p1 - text->p0;
 				frdelete(text, text->p0, text->p1);
-				save();
+				send(keypressed, &dummy);
 				break;
 			case 1:
 				if (text->p0 == text->p1)
@@ -652,34 +566,32 @@ threadmain(int argc, char **argv)
 					fprint(2, "open /dev/snarf: %r\n");
 					continue;
 				}
-				i = 0;
+
 				y = 0;
-				while ((r = read(fd, s + y, UTFmax - y + 1)) > 0) {
-					l = 0;
-					while(l < r) {
-						contentslen++;
-						contents = realloc(contents, contentslen * sizeof(Rune));
-						memmove(&contents[text->p1 + i + 1], &contents[text->p1 + i], contentslen - (text->p1 + i + 1));
-						x = chartorune(&contents[text->p1 + i], s);
-						memmove(s, s + x, UTFmax - x + 1);
-						if (x == 1 && contents[text->p1 + 1] == Runeerror) {
-							contentslen--;
-							memmove(&contents[text->p1 + i], &contents[text->p1 + i + 1], contentslen - (text->p1 + i + 1));
-							break;
-						}
-						l += x;
-						i++;
+				while ((r = read(fd, buf + y, BUFLEN - y)) > 0) {
+					if (r < 0) {
+						fprint(2, "read: /dev/snarf: %r\n");
 					}
-					y = l - UTFmax - 1;
+					l = utfnlen(buf, r);
+					y = r - l;
+					contentslen += l;
+					contents = realloc(contents, contentslen * sizeof(Rune));
+					memmove(&contents[text->p1 + l], &contents[text->p1], contentslen - (text->p1 + l));
+					i = 0;
+					while(l > 0) {
+						r = chartorune(&contents[text->p1 + i], buf + i);
+						l -= r;
+						i += r;
+					}
+					memmove(buf, buf + i, y);
 				}
 				frinsert(text, &contents[text->p1], &contents[text->p1 + i], text->p1);
 				close(fd);
-				save();
+				send(keypressed, &dummy);
 				break;
 			case 3:
 				closekeyboard(kc);
 				closemouse(mc);
-				closedisplay(display);
 				threadexitsall(nil);
 			default:
 				break;	
