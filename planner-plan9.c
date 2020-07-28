@@ -45,10 +45,8 @@ emalloc(unsigned int n)
 }
 
 void
-updateday(Image *screen)
+drawday(Image *screen, int x, int y, int mday, Image *bg, Image *fg)
 {
-	int x, y;
-	int mday;
 	char *buf = emalloc(BUFLEN);
 	int fd;
 	Tm *tm = localtime(t);
@@ -56,35 +54,44 @@ updateday(Image *screen)
 	int r, i;
 	Rune rune;
 
+	draw(screen, daybuttons[x][y], bg, nil, ZP);
+	snprint(buf, BUFLEN-1, "%d", mday);
+	string(screen, daybuttons[x][y].min, fg, ZP, display->defaultfont, buf);
+	mdays[x][y] = mday;
+	snprint(buf, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d/index.txt", getenv("home"), year, tm->mon+1, mday);
+	fd = open(buf, OREAD);
+	if (fd > 0) {
+		r = read(fd, buf, BUFLEN-1);
+		if (r > 0) {
+			buf[r] = '\0';
+			buf[strcspn(buf, "\r\n")] = '\0';
+			for(r = 0, i = 0, rune = L'\0'; rune != Runeerror && i < 3 && buf[r] != 0; r += chartorune(&rune, buf + r), i++);
+			if (rune == Runeerror)
+				r--;
+			buf[r] = '\0';
+			string(screen, addpt(daybuttons[x][y].min, Pt(0, Dy(buttons[0]))), fg, ZP, display->defaultfont, buf);
+		}
+		close(fd);
+	}
+
+	free(buf);
+}
+
+void
+updateday(Image *screen)
+{
+	int x, y;
+	int mday;
+
 	for (y = 0; y < 6; y++) {
 		for (x = 0; x < 7; x++) {
 			mday = mdays[x][y];
 			if (mday == monthday) {
-				draw(screen, daybuttons[x][y], display->black, nil, ZP);
-				snprint(buf, BUFLEN-1, "%d", mday);
-				string(screen, daybuttons[x][y].min, display->white, ZP, display->defaultfont, buf);
-				mdays[x][y] = mday;
-				snprint(buf, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d/index.txt", getenv("home"), year, tm->mon+1, mday);
-				fd = open(buf, OREAD);
-				if (fd > 0) {
-					r = read(fd, buf, BUFLEN-1);
-					if (r > 0) {
-						buf[r] = '\0';
-						buf[strcspn(buf, "\r\n")] = '\0';
-						for(r = 0, i = 0, rune = L'\0'; rune != Runeerror && i < 3 && buf[r] != 0; r += chartorune(&rune, buf + r), i++);
-						if (rune == Runeerror)
-							r--;
-						buf[r] = '\0';
-						string(screen, addpt(daybuttons[x][y].min, Pt(0, Dy(buttons[0]))), display->white, ZP, display->defaultfont, buf);
-					}
-					close(fd);
-				}
-				mday++;
+				drawday(screen, x, y, mday, display->black, display->white);
 			}
 		}
 	}
 
-	free(buf);
 	flushimage(display, 1);
 }
 
@@ -123,7 +130,7 @@ updateall(Image *screen)
 		fd = open(buf, OREAD);
 	}
 	if (fd < 0) {
-		fprint(2, "error opening plans directory\n");
+		fprint(2, "error opening plans directory: %r\n");
 		exitall("open");
 	}
 	close(fd);
@@ -212,27 +219,8 @@ updateall(Image *screen)
 			if (mday > monthlens[tm->mon])
 				mday = 0;
 			if (mday != 0) {
-				draw(screen, daybuttons[x][y], mday == monthday? display->black: display->white, nil, ZP);
-				snprint(buf, BUFLEN-1, "%d", mday);
-				string(screen, daybuttons[x][y].min, mday == monthday? display->white: display->black, ZP, display->defaultfont, buf);
 				mdays[x][y] = mday;
-
-				snprint(buf, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d/index.txt", getenv("home"), year, tm->mon+1, mday);
-				fd = open(buf, OREAD);
-				if (fd > 0) {
-					r = read(fd, buf, BUFLEN-1);
-					if (r > 0) {
-						buf[r] = '\0';
-						buf[strcspn(buf, "\r\n")] = '\0';
-						for(i = 0, r = 0, runes[0] = L'\0'; runes[0] != Runeerror && i < 3 && buf[r] != '\0'; r += chartorune(runes, buf + r), i++);
-						if (runes[0] == Runeerror)
-							r--;
-						buf[r] = '\0';
-						string(screen, addpt(daybuttons[x][y].min, Pt(0, todaysize.y)), mday == monthday? display->white: display->black, ZP, display->defaultfont, buf);
-					}
-					close(fd);
-				}
-
+				drawday(screen, x, y, mday, mday == monthday? display->black: display->white, mday == monthday? display->white: display->black);
 				mday++;
 			}
 		}
@@ -392,6 +380,23 @@ keyboardthread(void *)
 }
 
 void
+chkdir(char *fname) {
+	Dir *dir;
+	int fd;
+
+	dir = dirstat(fname);
+	if (dir == nil) {
+		fd = create(fname, OREAD, 0775L | DMDIR);
+		if (fd > 0) {
+			close(fd);
+		} else {
+			fprint(2, "unable to create %s: %r\n", fname);
+			exitall("create");
+		}
+	}
+}
+
+void
 save(void)
 {
 	char *buf;
@@ -399,7 +404,6 @@ save(void)
 	int fd;
 	Tm *tm;
 	char *fname = emalloc(BUFLEN);
-	Dir *dir;
 	Rune r[2];
 
 	buf = emalloc(contentslen * UTFmax);
@@ -413,49 +417,39 @@ save(void)
 	tm = localtime(t);
 
 	snprint(fname, BUFLEN-1, "%s/lib/plans/%d", getenv("home"), tm->year + 1900);
-	dir = dirstat(fname);
-	if (dir == nil) {
-		fd = create(fname, OREAD, 0775L | DMDIR);
-		if (fd > 0) {
-			close(fd);
-		}
-	}
+	chkdir(fname);
+
 	snprint(fname, BUFLEN-1, "%s/lib/plans/%d/%02d", getenv("home"), tm->year + 1900, tm->mon + 1);
-	dir = dirstat(fname);
-	if (fd > 0 && dir == nil) {
-		fd = create(fname, OREAD, 0775L | DMDIR);
-		if (fd > 0) {
-			close(fd);
-		}
-	}
+	chkdir(fname);
+
 	snprint(fname, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d", getenv("home"), tm->year + 1900, tm->mon + 1, tm->mday);
-	dir = dirstat(fname);
-	if (fd > 0 && dir == nil) {
-		fd = create(fname, OREAD, 0775L | DMDIR);
-		if (fd > 0) {
-			close(fd);
+	chkdir(fname);
+
+	snprint(fname, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d/index.txt", getenv("home"), tm->year + 1900, tm->mon + 1, tm->mday);
+	fd = create(fname, OWRITE, 0664L);
+	if (fd > 0) {
+		i = 0;
+		while (i < p) {
+			w = write(fd, buf + i, p - i);
+			if (w < 0) {
+				fprint(2, "write error to %s: %r\n", fname);
+				exitall("write");
+			}
+			i += w;
 		}
+		close(fd);
+	} else {
+		fprint(2, "unable to create %s: %r\n", fname);
+		exitall("create");
 	}
 
-	if (dir != nil || fd > 0) {
-		snprint(fname, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d/index.txt", getenv("home"), tm->year + 1900, tm->mon + 1, tm->mday);
-		fd = create(fname, OWRITE, 0664L);
-		if (fd > 0) {
-			i = 0;
-			while (i < p) {
-				w = write(fd, buf + i, p - i);
-				if (w < 1)
-					break;
-				i += w;
-			}
-			close(fd);
-		}
-	}
 	free(buf);
+
 	if (fd < 0) {
 		fprint(2, "error saving file: %s\n", fname);
 		exitall("write");
 	}
+
 	updateday(screen);
 	flushimage(display, 1);
 	free(fname);
