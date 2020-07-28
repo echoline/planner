@@ -668,12 +668,12 @@ threadmain(int argc, char **argv)
 				clickcount = 0;
 				frselect(text, mc);
 			}
-			if (clickcount > 2) {
+			if (clickcount > 1) {
 				while(text->p0 > 0 && contents[text->p0 - 1] != L'\n') text->p0--;
 				while(text->p1 < text->nchars && contents[text->p1-1] != L'\n') text->p1++;
 				frdrawsel(text, frptofchar(text, text->p0), text->p0, text->p1, 1);
 				flushimage(display, 1);
-			} else if (clickcount > 1) {
+			} else if (clickcount > 0) {
 				while(text->p0 > 0 && !isspacerune(contents[text->p0 - 1])) text->p0--;
 				while(text->p1 < text->nchars && !isspacerune(contents[text->p1])) text->p1++;
 				frdrawsel(text, frptofchar(text, text->p0), text->p0, text->p1, 1);
