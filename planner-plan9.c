@@ -21,7 +21,15 @@ Mousectl *mc;
 Keyboardctl *kc;
 Rune *contents = nil;
 int contentslen = 0;
-Channel *keypressed;
+Channel *savec;
+
+void
+exitall(char *arg)
+{
+	closekeyboard(kc);
+	closemouse(mc);
+	threadexitsall(arg);
+}
 
 void*
 emalloc(unsigned int n)
@@ -31,9 +39,7 @@ emalloc(unsigned int n)
 	p = malloc(n);
 	if (p == nil) {
 		fprint(2, "planner: malloc failed: %r\n");
-		closekeyboard(kc);
-		closemouse(mc);
-		threadexitsall("malloc");
+		exitall("malloc");
 	}
 
 	return p;
@@ -114,9 +120,7 @@ updateall(Image *screen)
 	}
 	if (fd < 0) {
 		fprint(2, "error opening plans directory\n");
-		closekeyboard(kc);
-		closemouse(mc);
-		threadexitsall("error opening plans directory");
+		exitall("open");
 	}
 	close(fd);
 
@@ -251,7 +255,7 @@ savethread(void*)
 	ulong dummy;
 	ulong last = time(nil);
 
-	while(recv(keypressed, &dummy) > 0){
+	while(recv(savec, &dummy) > 0){
 		if (last < (time(nil) - 3)) {
 			save();
 			last = time(nil);
@@ -273,10 +277,7 @@ keyboardthread(void *)
 		textr = Rpt(addpt(screen->r.min, Pt(half, 0)), screen->r.max);
 
 		if (r[0] == Kdel){
-			closekeyboard(kc);
-			closemouse(mc);
-			closedisplay(display);
-			threadexitsall(nil);
+			exitall(nil);
 		} else if (r[0] == 0) {
 			continue;
 		} else if (r[0] == Kbs) {
@@ -348,7 +349,7 @@ keyboardthread(void *)
 		}
 
 		flushimage(display, 1);
-		send(keypressed, &dummy);
+		send(savec, &dummy);
 	}
 }
 
@@ -415,9 +416,7 @@ save(void)
 	free(buf);
 	if (fd < 0) {
 		fprint(2, "error saving file: %s\n", fname);
-		closekeyboard(kc);
-		closemouse(mc);
-		threadexitsall("write");
+		exitall("write");
 	}
 	updateday(screen);
 	flushimage(display, 1);
@@ -529,7 +528,7 @@ threadmain(int argc, char **argv)
 	textr = Rpt(addpt(screen->r.min, Pt(half, 0)), screen->r.max);
 	frinit(text, textr, display->defaultfont, screen, cols);
 
-	keypressed = chancreate(sizeof(ulong), 1);
+	savec = chancreate(sizeof(ulong), 1);
 
 	threadcreate(resizethread, nil, mainstacksize);
 	threadcreate(keyboardthread, nil, mainstacksize);
@@ -539,7 +538,7 @@ threadmain(int argc, char **argv)
 	menu.item = mstr;
 	menu.lasthit = 0;
 	while(recv(mc->c, &m) >= 0) {
-		send(keypressed, &dummy);
+		send(savec, &dummy);
 
 		if (m.buttons & 4) {
 			x = menuhit(3, mc, &menu, nil);
@@ -551,7 +550,7 @@ threadmain(int argc, char **argv)
 				memmove(&contents[text->p0], &contents[text->p1], contentslen - text->p1);
 				contentslen -= text->p1 - text->p0;
 				frdelete(text, text->p0, text->p1);
-				send(keypressed, &dummy);
+				send(savec, &dummy);
 				flushimage(display, 1);
 				break;
 			case 1:
@@ -560,44 +559,45 @@ threadmain(int argc, char **argv)
 				tosnarf();
 				break;
 			case 2:
-				if (text->p0 != text->p1) {
-					memmove(&contents[text->p0], &contents[text->p1], contentslen - text->p1);
-					contentslen -= text->p1 - text->p0;
-					frdelete(text, text->p0, text->p1);
-				}
 				fd = open("/dev/snarf", OREAD);
 				if (fd < 0) {
 					fprint(2, "open /dev/snarf: %r\n");
 					continue;
 				}
 
+				if (text->p0 != text->p1) {
+					memmove(&contents[text->p0], &contents[text->p1], contentslen - text->p1);
+					contentslen -= text->p1 - text->p0;
+					frdelete(text, text->p0, text->p1);
+				}
+
 				y = 0;
 				while ((r = read(fd, buf + y, BUFLEN - y)) > 0) {
-					if (r < 0) {
-						fprint(2, "read: /dev/snarf: %r\n");
-					}
 					l = utfnlen(buf, r);
-					y = r - l;
+					y = r;
 					contentslen += l;
 					contents = realloc(contents, contentslen * sizeof(Rune));
 					memmove(&contents[text->p1 + l], &contents[text->p1], contentslen - (text->p1 + l));
 					i = 0;
-					while(l > 0) {
-						r = chartorune(&contents[text->p1 + i], buf + i);
-						l -= r;
+					x = 0;
+					while(x < l) {
+						r = chartorune(&contents[text->p1 + x], buf + i);
+						x++;
 						i += r;
+						y -= r;
 					}
 					memmove(buf, buf + i, y);
 				}
-				frinsert(text, &contents[text->p1], &contents[text->p1 + i], text->p1);
+				if (r < 0)
+					fprint(2, "read: /dev/snarf: %r\n");
+				else
+					frinsert(text, &contents[text->p1], &contents[text->p1 + l], text->p1);
 				close(fd);
-				send(keypressed, &dummy);
+				send(savec, &dummy);
 				flushimage(display, 1);
 				break;
 			case 3:
-				closekeyboard(kc);
-				closemouse(mc);
-				threadexitsall(nil);
+				exitall(nil);
 			default:
 				break;	
 			}
