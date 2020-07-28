@@ -53,7 +53,8 @@ updateday(Image *screen)
 	int fd;
 	Tm *tm = localtime(t);
 	int year = tm->year + 1900;
-	int r;
+	int r, i;
+	Rune rune;
 
 	for (y = 0; y < 6; y++) {
 		for (x = 0; x < 7; x++) {
@@ -66,10 +67,14 @@ updateday(Image *screen)
 				snprint(buf, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d/index.txt", getenv("home"), year, tm->mon+1, mday);
 				fd = open(buf, OREAD);
 				if (fd > 0) {
-					r = read(fd, buf, 3);
+					r = read(fd, buf, BUFLEN-1);
 					if (r > 0) {
 						buf[r] = '\0';
 						buf[strcspn(buf, "\r\n")] = '\0';
+						for(r = 0, i = 0, rune = L'\0'; rune != Runeerror && i < 3 && buf[r] != 0; r += chartorune(&rune, buf + r), i++);
+						if (rune == Runeerror)
+							r--;
+						buf[r] = '\0';
 						string(screen, addpt(daybuttons[x][y].min, Pt(0, Dy(buttons[0]))), display->white, ZP, display->defaultfont, buf);
 					}
 					close(fd);
@@ -215,10 +220,14 @@ updateall(Image *screen)
 				snprint(buf, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d/index.txt", getenv("home"), year, tm->mon+1, mday);
 				fd = open(buf, OREAD);
 				if (fd > 0) {
-					r = read(fd, buf, 3);
+					r = read(fd, buf, BUFLEN-1);
 					if (r > 0) {
 						buf[r] = '\0';
 						buf[strcspn(buf, "\r\n")] = '\0';
+						for(i = 0, r = 0, runes[0] = L'\0'; runes[0] != Runeerror && i < 3 && buf[r] != '\0'; r += chartorune(runes, buf + r), i++);
+						if (runes[0] == Runeerror)
+							r--;
+						buf[r] = '\0';
 						string(screen, addpt(daybuttons[x][y].min, Pt(0, todaysize.y)), mday == monthday? display->white: display->black, ZP, display->defaultfont, buf);
 					}
 					close(fd);
@@ -265,6 +274,44 @@ keyboardthread(void *)
 			exitall(nil);
 		} else if (r[0] == 0) {
 			continue;
+		} else if (r[0] == Ksoh || r[0] == Khome) {
+			if (text->p0 != text->p1)
+				continue;
+
+			for (p = text->p0; p > 0 && contents[p-1] != L'\n'; p--);
+			frtick(text, frptofchar(text, text->p0), 0);
+			text->p0 = text->p1 = p;
+			frtick(text, frptofchar(text, text->p0), 1);
+			flushimage(display, 1);
+			continue;
+		} else if (r[0] == Kenq || r[0] == Kend) {
+			if (text->p0 != text->p1)
+				continue;
+
+			for (p = text->p1; p < text->nchars && contents[p] != L'\n'; p++);
+			frtick(text, frptofchar(text, text->p1), 0);
+			text->p0 = text->p1 = p;
+			frtick(text, frptofchar(text, text->p1), 1);
+			flushimage(display, 1);
+			continue;
+		} else if (r[0] == Kpgup) {
+			if (text->p0 != text->p1)
+				continue;
+
+			frtick(text, frptofchar(text, text->p0), 0);
+			text->p0 = text->p1 = 0;
+			frtick(text, frptofchar(text, text->p0), 1);
+			flushimage(display, 1);
+			continue;
+		} else if (r[0] == Kpgdown) {
+			if (text->p0 != text->p1)
+				continue;
+
+			frtick(text, frptofchar(text, text->p0), 0);
+			text->p0 = text->p1 = text->nchars;
+			frtick(text, frptofchar(text, text->p0), 1);
+			flushimage(display, 1);
+			continue;
 		} else if (r[0] == Kbs) {
 			if (text->p1 == 0)
 				continue;
@@ -276,8 +323,8 @@ keyboardthread(void *)
 			frtick(text, frptofchar(text, text->p1), 0);
 			frdelete(text, text->p0, text->p1);
 			frtick(text, frptofchar(text, text->p1), 1);
-		} else if (r[0] == Kleft && text->p1 == text->p0) {
-			if (text->p1 == 0)
+		} else if (r[0] == Kleft) {
+			if (text->p1 == 0 || text->p0 != text->p1)
 				continue;
 
 			frtick(text, frptofchar(text, text->p1), 0);
@@ -286,8 +333,8 @@ keyboardthread(void *)
 			frtick(text, frptofchar(text, text->p1), 1);
 			flushimage(display, 1);
 			continue;
-		} else if (r[0] == Kright && text->p1 == text->p0) {
-			if (text->p1 == text->nchars)
+		} else if (r[0] == Kright) {
+			if (text->p1 == text->nchars || text->p0 != text->p1)
 				continue;
 
 			frtick(text, frptofchar(text, text->p1), 0);
@@ -296,7 +343,10 @@ keyboardthread(void *)
 			frtick(text, frptofchar(text, text->p1), 1);
 			flushimage(display, 1);
 			continue;
-		} else if (r[0] == Kup && text->p1 == text->p0) {
+		} else if (r[0] == Kup) {
+			if (text->p0 != text->p1)
+				continue;
+
 			for (p = text->p0, l = 0; p > 0 && contents[p-1] != L'\n'; p--, l++);
 			if (p == 0)
 				continue;
@@ -307,7 +357,10 @@ keyboardthread(void *)
 			frtick(text, frptofchar(text, text->p0), 1);
 			flushimage(display, 1);
 			continue;
-		} else if (r[0] == Kdown && text->p1 == text->p0) {
+		} else if (r[0] == Kdown) {
+			if (text->p1 != text->p0)
+				continue;
+
 			for (p = text->p0, l = 0; p > 0 && contents[p-1] != L'\n'; p--, l++);
 			for (p = text->p0; p < text->nchars && contents[p] != L'\n'; p++);
 			if (p == text->nchars)
