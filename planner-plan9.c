@@ -652,10 +652,11 @@ threadmain(int argc, char **argv)
 
 		if (ptinrect(m.xy, buttons[2])) {
 			tm = localtime(t);
-			t += monthday * 24 * 3600;
+			t += (monthlens[tm->mon] - monthday + 1) * 24 * 3600;
+			tm = localtime(t);
 			if (monthday > monthlens[tm->mon])
 				monthday = monthlens[tm->mon];
-			t += (monthlens[tm->mon] - monthday) * 24 * 3600;
+			t += (monthday - 1) * 24 * 3600;
 			updateall(screen);
 			continue;
 		}
