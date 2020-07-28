@@ -481,6 +481,9 @@ threadmain(int argc, char **argv)
 	char *buf;
 	int r, l, i;
 	ulong dummy = 1;
+	long click = 0;
+	long clickcount = 0;
+	int dt;
 
 	if(initdraw(0,0,"planner") < 0)
 		sysfatal("initdraw: %r");
@@ -549,6 +552,7 @@ threadmain(int argc, char **argv)
 				contentslen -= text->p1 - text->p0;
 				frdelete(text, text->p0, text->p1);
 				send(keypressed, &dummy);
+				flushimage(display, 1);
 				break;
 			case 1:
 				if (text->p0 == text->p1)
@@ -588,6 +592,7 @@ threadmain(int argc, char **argv)
 				frinsert(text, &contents[text->p1], &contents[text->p1 + i], text->p1);
 				close(fd);
 				send(keypressed, &dummy);
+				flushimage(display, 1);
 				break;
 			case 3:
 				closekeyboard(kc);
@@ -654,7 +659,26 @@ threadmain(int argc, char **argv)
 
 		half = Dx(screen->r)/2;
 		textr = Rpt(Pt(screen->r.min.x + half, screen->r.min.y), screen->r.max);
-		if (ptinrect(m.xy, textr))
-			frselect(text, mc);
+		if (ptinrect(m.xy, textr)) {
+			dt = m.msec - click;
+			click = m.msec;
+			if (dt < 500)
+				clickcount++;
+			else {
+				clickcount = 0;
+				frselect(text, mc);
+			}
+			if (clickcount > 2) {
+				while(text->p0 > 0 && contents[text->p0 - 1] != L'\n') text->p0--;
+				while(text->p1 < text->nchars && contents[text->p1-1] != L'\n') text->p1++;
+				frdrawsel(text, frptofchar(text, text->p0), text->p0, text->p1, 1);
+				flushimage(display, 1);
+			} else if (clickcount > 1) {
+				while(text->p0 > 0 && !isspacerune(contents[text->p0 - 1])) text->p0--;
+				while(text->p1 < text->nchars && !isspacerune(contents[text->p1])) text->p1++;
+				frdrawsel(text, frptofchar(text, text->p0), text->p0, text->p1, 1);
+				flushimage(display, 1);
+			}
+		}
 	}
 }
