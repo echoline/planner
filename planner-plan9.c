@@ -218,7 +218,8 @@ updateall(Image *screen)
 		while((r = read(fd, buf, BUFLEN-1)) > 0) {
 			for(x = 0, y = 0; x < r;) {
 				x += chartorune(&runes[y], &buf[x]);
-				y++;
+				if (runes[y] != Runeerror)
+					y++;
 			}
 			frinsert(text, runes, &runes[y], text->p1);
 			contents = realloc(contents, (contentslen + y) * sizeof(Rune));
@@ -647,6 +648,7 @@ threadmain(int argc, char **argv)
 						y -= r;
 					}
 					memmove(buf, buf + i, y);
+					text->p0 = text->p1 = text->p1 + l;
 				}
 				if (r < 0)
 					fprint(2, "read: /dev/snarf: %r\n");
