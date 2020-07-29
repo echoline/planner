@@ -6,6 +6,7 @@
 #include <frame.h>
 #include <keyboard.h>
 #define BUFLEN 1024
+#define HALFMAX 360
 
 Image *back;
 Rectangle **daybuttons;
@@ -21,6 +22,7 @@ Mousectl *mc;
 Keyboardctl *kc;
 Rune *contents = nil;
 int contentslen = 0;
+int half;
 
 void
 exitall(char *arg)
@@ -98,8 +100,7 @@ updateday(Image *screen)
 void
 updateall(Image *screen)
 {
-	int height = Dy(screen->r) > 512? 512: Dy(screen->r);
-	int half = Dx(screen->r)/2;
+	int height = Dy(screen->r) > 420? 420: Dy(screen->r);
 	int x, y;
 	char *buf = emalloc(BUFLEN);
 	int year;
@@ -119,6 +120,8 @@ updateall(Image *screen)
 	Point yearsize;
 	Rectangle textr = Rpt(addpt(screen->r.min, Pt(half, 0)), screen->r.max);
 	Rune *runes = emalloc(BUFLEN * sizeof(Rune));
+
+	half = Dx(screen->r)/2 > HALFMAX? HALFMAX: Dx(screen->r)/2;
 
 	snprint(buf, BUFLEN-1, "%s/lib/plans", getenv("home"));
 	dir = dirstat(buf);
@@ -163,7 +166,7 @@ updateall(Image *screen)
 
 	for (y = 0; y < 6; y++) {
 		for (x = 0; x < 7; x++) {
-			daybuttons[x][y] = rectaddpt(insetrect(Rect(x * ((half-20)/7), y * ((height-70)/6), (x+1) * ((half-20)/7), (y+1) * ((height-70)/6)), 10), Pt(screen->r.min.x, screen->r.min.y + 50));
+			daybuttons[x][y] = rectaddpt(insetrect(Rect(x * (half/7), y * ((height-70)/6), (x+1) * (half/7), (y+1) * ((height-70)/6)), 10), Pt(screen->r.min.x, screen->r.min.y + 50));
 		}
 	}
 
@@ -249,13 +252,11 @@ void
 keyboardthread(void *)
 {
 	Rune r[2];
-	int half;
 	Rectangle textr;
 	int i, p, l, w;
 	ulong dummy = 1;
 
 	while(recv(kc->c, r) > 0){
-		half = Dx(screen->r)/2;
 		textr = Rpt(addpt(screen->r.min, Pt(half, 0)), screen->r.max);
 
 		if (r[0] == Kdel){
@@ -504,7 +505,6 @@ threadmain(int argc, char **argv)
 	Mouse m;
 	int x, y;
 	Tm *tm;
-	int half;
 	Rectangle textr;
 	Menu menu;
 	char *mstr[] = {"cut", "snarf", "paste", "exit", 0};
@@ -538,7 +538,7 @@ threadmain(int argc, char **argv)
 	monthlens[0] = monthlens[2] = monthlens[4] = monthlens[6] = monthlens[7] = monthlens[9] = monthlens[11] = 31;
 	monthlens[1] = 28;
 
-	half = Dx(screen->r)/2;
+	half = Dx(screen->r)/2 > HALFMAX? HALFMAX: Dx(screen->r)/2;
 	t = time(nil);
 	buf = emalloc(BUFLEN);
 
@@ -676,7 +676,6 @@ threadmain(int argc, char **argv)
 			}
 		}
 
-		half = Dx(screen->r)/2;
 		textr = Rpt(Pt(screen->r.min.x + half, screen->r.min.y), screen->r.max);
 		if (ptinrect(m.xy, textr)) {
 			dt = m.msec - click;
