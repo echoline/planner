@@ -6,7 +6,6 @@
 #include <frame.h>
 #include <keyboard.h>
 #define BUFLEN 1024
-#define HALFMAX 360
 
 Image *back;
 Rectangle **daybuttons;
@@ -23,6 +22,34 @@ Keyboardctl *kc;
 Rune *contents = nil;
 int contentslen = 0;
 int half;
+int height;
+int charwidth = 0;
+int charheight = 0;
+
+Point
+calcdims(void)
+{
+	int i;
+	Fontchar *fc;
+	Point ret = Pt(0, 0);
+
+	for (i = 0; i <= display->defaultsubfont->n; i++) {
+		fc = &display->defaultsubfont->info[i];
+		if (fc->width > charwidth)
+			charwidth = fc->width;
+	}
+
+	ret.x = charwidth;
+	ret.y = charheight = display->defaultsubfont->height;
+
+	ret.x *= 21;
+	ret.x += 5 * 14;
+
+	ret.y *= 14;
+	ret.y += 5 * 14;
+
+	return ret;
+}
 
 void
 exitall(char *arg)
@@ -71,7 +98,7 @@ drawday(Image *screen, int x, int y, int mday, Image *bg, Image *fg)
 			if (rune == Runeerror)
 				r--;
 			buf[r] = '\0';
-			string(screen, addpt(daybuttons[x][y].min, Pt(0, Dy(buttons[0]))), fg, ZP, display->defaultfont, buf);
+			string(screen, addpt(daybuttons[x][y].min, Pt(0, charheight)), fg, ZP, display->defaultfont, buf);
 		}
 		close(fd);
 	}
@@ -98,9 +125,21 @@ updateday(Image *screen)
 }
 
 void
+resize(int w, int h)
+{
+	int fd;
+
+	fd = open("/dev/wctl", OWRITE);
+	if(fd >= 0){
+		fprint(fd, "resize -dx %d -dy %d", w, h);
+		close(fd);
+	}
+
+}
+
+void
 updateall(Image *screen)
 {
-	int height = Dy(screen->r) > 420? 420: Dy(screen->r);
 	int x, y;
 	char *buf = emalloc(BUFLEN);
 	int year;
@@ -121,7 +160,18 @@ updateall(Image *screen)
 	Rectangle textr = Rpt(addpt(screen->r.min, Pt(half, 0)), screen->r.max);
 	Rune *runes = emalloc(BUFLEN * sizeof(Rune));
 
-	half = Dx(screen->r)/2 > HALFMAX? HALFMAX: Dx(screen->r)/2;
+	x = Dx(screen->r) - 10;
+	y = Dy(screen->r) - 10;
+
+	if (x < half * 2 || y < height) {
+		if (x < half * 2)
+			x = half * 2 + 10;
+		if (y < height)
+			y = height + 10;
+
+		resize(x, y);
+		return;
+	}
 
 	snprint(buf, BUFLEN-1, "%s/lib/plans", getenv("home"));
 	dir = dirstat(buf);
@@ -138,9 +188,9 @@ updateall(Image *screen)
 	}
 	close(fd);
 
-	todaysize = stringsize(display->defaultfont, "Today");
-	movesize = stringsize(display->defaultfont, "<<");
-	monthsize = stringsize(display->defaultfont, "September"); // longest month name in any font hopefully
+	todaysize = Pt(5 * charwidth, charheight);
+	movesize = Pt(2 * charwidth, charheight);
+	monthsize = Pt(9 * charwidth, charheight);
 	year = tm->year + 1900;
 	monthlens[1] = 28;
 	isleap = (year % 4 == 0) && ((year % 100 != 0) || (year % 400 == 0));
@@ -149,16 +199,16 @@ updateall(Image *screen)
 	snprint(buf, BUFLEN-1, "%d", year);
 	yearsize = stringsize(display->defaultfont, buf);
 
-	tmppt = addpt(screen->r.min, Pt(10, 10));
+	tmppt = addpt(screen->r.min, Pt(5, 5));
 	buttons[0] = Rpt(tmppt, addpt(tmppt, todaysize));
 
-	tmppt.x += todaysize.x + 20;
+	tmppt.x += todaysize.x + 5;
 	buttons[1] = Rpt(tmppt, addpt(tmppt, movesize));
 
 	tmppt.x += movesize.x + monthsize.x;
 	buttons[2] = Rpt(tmppt, addpt(tmppt, movesize));
 
-	tmppt.x += movesize.x + 20;
+	tmppt.x += movesize.x + 5;
 	buttons[3] = Rpt(tmppt, addpt(tmppt, movesize));
 
 	tmppt.x += movesize.x + yearsize.x;
@@ -166,7 +216,7 @@ updateall(Image *screen)
 
 	for (y = 0; y < 6; y++) {
 		for (x = 0; x < 7; x++) {
-			daybuttons[x][y] = rectaddpt(insetrect(Rect(x * (half/7), y * ((height-70)/6), (x+1) * (half/7), (y+1) * ((height-70)/6)), 10), Pt(screen->r.min.x, screen->r.min.y + 50));
+			daybuttons[x][y] = rectaddpt(insetrect(Rect(x * (half/7), y * ((height - charheight * 2 - 10)/6), (x+1) * (half/7), (y+1) * ((height - charheight * 2 - 10)/6)), 5), Pt(screen->r.min.x, screen->r.min.y + charheight * 2 + 10));
 		}
 	}
 
@@ -211,7 +261,7 @@ updateall(Image *screen)
 	mday = 0;
 
 	for(x = 0; x < 7; x++) {
-		string(screen, addpt(daybuttons[x][0].min, Pt(0, -todaysize.y)), display->black, ZP, display->defaultfont, weekdays[x]);
+		string(screen, addpt(daybuttons[x][0].min, Pt(0, -charheight)), display->black, ZP, display->defaultfont, weekdays[x]);
 	}
 
 	for (y = 0; y < 6; y++) {
@@ -515,6 +565,7 @@ threadmain(int argc, char **argv)
 	long click = 0;
 	long clickcount = 0;
 	int dt;
+	Point caldims;
 
 	if(initdraw(0,0,"planner") < 0)
 		sysfatal("initdraw: %r");
@@ -538,7 +589,9 @@ threadmain(int argc, char **argv)
 	monthlens[0] = monthlens[2] = monthlens[4] = monthlens[6] = monthlens[7] = monthlens[9] = monthlens[11] = 31;
 	monthlens[1] = 28;
 
-	half = Dx(screen->r)/2 > HALFMAX? HALFMAX: Dx(screen->r)/2;
+	caldims = calcdims();
+	half = caldims.x;
+	height = caldims.y;
 	t = time(nil);
 	buf = emalloc(BUFLEN);
 
