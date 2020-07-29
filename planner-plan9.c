@@ -78,7 +78,7 @@ drawday(Image *screen, int x, int y, int mday, Image *bg, Image *fg)
 	snprint(buf, BUFLEN-1, "%d", mday);
 	string(screen, daybuttons[x][y].min, fg, ZP, display->defaultfont, buf);
 	mdays[x][y] = mday;
-	snprint(buf, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d/index.txt", getenv("home"), year, tm->mon+1, mday);
+	snprint(buf, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d/index.md", getenv("home"), year, tm->mon+1, mday);
 	fd = open(buf, OREAD);
 	if (fd > 0) {
 		r = read(fd, buf, BUFLEN-1);
@@ -209,7 +209,7 @@ updateall(Image *screen)
 	frinit(text, textr, display->defaultfont, screen, cols);
 	contentslen = 0;
 
-	snprint(buf, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d/index.txt", getenv("home"), year, tm->mon+1, tm->mday);
+	snprint(buf, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d/index.md", getenv("home"), year, tm->mon+1, tm->mday);
 	fd = open(buf, OREAD);
 	if (fd > 0) {
 		while((r = read(fd, buf, BUFLEN-1)) > 0) {
@@ -458,7 +458,7 @@ save(void)
 	snprint(fname, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d", getenv("home"), tm->year + 1900, tm->mon + 1, tm->mday);
 	chkdir(fname);
 
-	snprint(fname, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d/index.txt", getenv("home"), tm->year + 1900, tm->mon + 1, tm->mday);
+	snprint(fname, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d/index.md", getenv("home"), tm->year + 1900, tm->mon + 1, tm->mday);
 	fd = create(fname, OWRITE, 0664L);
 	if (fd > 0) {
 		i = 0;

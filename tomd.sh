@@ -17,7 +17,7 @@ for YYYY in $HOME/.plans/[0-9][0-9][0-9][0-9]; do
 				echo -n " ";
 				echo $(basename $YYYY);
 				echo ----
-				cat $DD/index.txt;
+				cat $DD/index.md;
 				echo; echo;
 			fi
 		done

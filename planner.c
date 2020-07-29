@@ -43,7 +43,7 @@ gchar*
 details(GtkCalendar *calendar, guint year, guint month, guint day, gpointer user_data) {
 	gchar *text;
 	gchar *dir = makepath(year, month, day);
-	gchar *path = g_strconcat(dir, "index.txt", NULL);
+	gchar *path = g_strconcat(dir, "index.md", NULL);
 
 	g_free(dir);
 	g_file_get_contents(path, &text, NULL, NULL);
@@ -120,7 +120,7 @@ on_calendar1_day_selected(GtkCalendar *widget, gpointer arg) {
 		g_free(dir);
 
 	dir = makepath(year, month, day);
-	path = g_strconcat(dir, "index.txt", NULL);
+	path = g_strconcat(dir, "index.md", NULL);
 	load(stuff->notes);
 
 }

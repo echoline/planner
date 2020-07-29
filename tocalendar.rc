@@ -9,8 +9,8 @@ for (y in $home/lib/plans/[0-9][0-9][0-9][0-9]) {
 		for (d in $m/[0-3][0-9]) {
 			D=`{basename $d | sed 's/^0*//'}
 
-			if (test -f $d/index.txt) {
-				awk '{ print "'^$M^'/'^$D^' '^$Y^' " $0 }' $d/index.txt
+			if (test -f $d/index.md) {
+				awk '{ print "'^$M^'/'^$D^' '^$Y^' " $0 }' $d/index.md
 			}
 		}
 	}
