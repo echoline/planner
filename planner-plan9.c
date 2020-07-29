@@ -132,7 +132,7 @@ void
 updateall(Image *screen)
 {
 	int x, y;
-	char *buf = emalloc(BUFLEN);
+	char *buf;
 	int year;
 	int wdaystart;
 	int mday;
@@ -144,7 +144,7 @@ updateall(Image *screen)
 	char *weekdays[] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
 	char *months[] = { "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" };
 	Rectangle textr = Rpt(addpt(screen->r.min, Pt(half, 0)), screen->r.max);
-	Rune *runes = emalloc(BUFLEN * sizeof(Rune));
+	Rune *runes;
 	Point todaysize = Pt(5 * charwidth, charheight);
 	Point movesize = Pt(2 * charwidth, charheight);
 	Point monthsize = Pt(9 * charwidth, charheight);
@@ -153,7 +153,6 @@ updateall(Image *screen)
 
 	x = Dx(screen->r);
 	y = Dy(screen->r);
-
 	if (x < half * 2 || y < height) {
 		if (x < half * 2)
 			x = half * 2 + 20;
@@ -163,6 +162,9 @@ updateall(Image *screen)
 		resize(x, y);
 		return;
 	}
+
+	buf = emalloc(BUFLEN);
+	runes = emalloc(BUFLEN * sizeof(Rune));
 
 	snprint(buf, BUFLEN-1, "%s/lib/plans", getenv("home"));
 	dir = dirstat(buf);
@@ -501,15 +503,16 @@ void
 tosnarf(void)
 {
 	int fd = open("/dev/snarf", OWRITE);
-	char *buf = emalloc(BUFLEN);
+	char *buf;
 	int l;
 	int i, r, a;
 
 	if (fd < 0) {
 		fprint(2, "open /dev/snarf: %r\n");
-		free(buf);
 		return;
 	}
+
+	buf = emalloc(BUFLEN);
 
 	for (i = text->p0; i < text->p1;) {
 		a = 0;
