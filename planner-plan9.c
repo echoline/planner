@@ -145,6 +145,11 @@ updateall(Image *screen)
 	char *months[] = { "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" };
 	Rectangle textr = Rpt(addpt(screen->r.min, Pt(half, 0)), screen->r.max);
 	Rune *runes = emalloc(BUFLEN * sizeof(Rune));
+	Point todaysize = Pt(5 * charwidth, charheight);
+	Point movesize = Pt(2 * charwidth, charheight);
+	Point monthsize = Pt(9 * charwidth, charheight);
+	Point yearsize = Pt(4 * charwidth, charheight);
+	Point tmppt;
 
 	x = Dx(screen->r) - 10;
 	y = Dy(screen->r) - 10;
@@ -179,6 +184,23 @@ updateall(Image *screen)
 	isleap = (year % 4 == 0) && ((year % 100 != 0) || (year % 400 == 0));
 	if (isleap)
 		monthlens[1] = 29;
+
+	tmppt = addpt(screen->r.min, Pt(5, 5));
+	buttons[0] = Rpt(tmppt, addpt(tmppt, todaysize));
+	tmppt.x += todaysize.x + 5;
+	buttons[1] = Rpt(tmppt, addpt(tmppt, movesize));
+	tmppt.x += movesize.x + monthsize.x;
+	buttons[2] = Rpt(tmppt, addpt(tmppt, movesize));
+	tmppt.x += movesize.x + 5;
+	buttons[3] = Rpt(tmppt, addpt(tmppt, movesize));
+	tmppt.x += movesize.x + yearsize.x;
+	buttons[4] = Rpt(tmppt, addpt(tmppt, movesize));
+
+	for (y = 0; y < 6; y++) {
+		for (x = 0; x < 7; x++) {
+			daybuttons[x][y] = rectaddpt(insetrect(Rect(x * (half/7), y * ((height - charheight * 2 - 10)/6), (x+1) * (half/7), (y+1) * ((height - charheight * 2 - 10)/6)), 5), Pt(screen->r.min.x, screen->r.min.y + charheight * 2 + 10));
+		}
+	}
 
 	draw(screen, screen->r, back, nil, ZP);
 
@@ -527,11 +549,6 @@ threadmain(int argc, char **argv)
 	long clickcount = 0;
 	int dt;
 	Point caldims;
-	Point todaysize = Pt(5 * charwidth, charheight);
-	Point movesize = Pt(2 * charwidth, charheight);
-	Point monthsize = Pt(9 * charwidth, charheight);
-	Point yearsize = Pt(4 * charwidth, charheight);
-	Point tmppt;
 
 	if(initdraw(0,0,"planner") < 0)
 		sysfatal("initdraw: %r");
@@ -554,28 +571,6 @@ threadmain(int argc, char **argv)
 	monthlens[8] = monthlens[3] = monthlens[5] = monthlens[10] = 30;
 	monthlens[0] = monthlens[2] = monthlens[4] = monthlens[6] = monthlens[7] = monthlens[9] = monthlens[11] = 31;
 	monthlens[1] = 28;
-
-	tmppt = addpt(screen->r.min, Pt(5, 5));
-	buttons[0] = Rpt(tmppt, addpt(tmppt, todaysize));
-
-	tmppt.x += todaysize.x + 5;
-	buttons[1] = Rpt(tmppt, addpt(tmppt, movesize));
-
-	tmppt.x += movesize.x + monthsize.x;
-	buttons[2] = Rpt(tmppt, addpt(tmppt, movesize));
-
-	tmppt.x += movesize.x + 5;
-	buttons[3] = Rpt(tmppt, addpt(tmppt, movesize));
-
-	tmppt.x += movesize.x + yearsize.x;
-	buttons[4] = Rpt(tmppt, addpt(tmppt, movesize));
-
-	for (y = 0; y < 6; y++) {
-		for (x = 0; x < 7; x++) {
-			daybuttons[x][y] = rectaddpt(insetrect(Rect(x * (half/7), y * ((height - charheight * 2 - 10)/6), (x+1) * (half/7), (y+1) * ((height - charheight * 2 - 10)/6)), 5), Pt(screen->r.min.x, screen->r.min.y + charheight * 2 + 10));
-		}
-	}
-
 
 	charwidth = calccharwidth();
 	charheight = display->defaultsubfont->height;
