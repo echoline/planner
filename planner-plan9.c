@@ -548,7 +548,7 @@ threadmain(int argc, char **argv)
 	char *mstr[] = {"cut", "snarf", "paste", "exit", 0};
 	int fd;
 	char *buf;
-	int r, l, i;
+	int r, l, i, s, start;
 	ulong dummy = 1;
 	long click = 0;
 	long clickcount = 0;
@@ -633,27 +633,28 @@ threadmain(int argc, char **argv)
 				}
 
 				y = 0;
+				start = s = text->p1;
 				while ((r = read(fd, buf + y, BUFLEN - y)) > 0) {
 					l = utfnlen(buf, r);
 					y = r;
 					contentslen += l;
 					contents = realloc(contents, contentslen * sizeof(Rune));
-					memmove(&contents[text->p1 + l], &contents[text->p1], contentslen - (text->p1 + l));
+					memmove(&contents[s + l], &contents[s], contentslen - (s + l));
 					i = 0;
 					x = 0;
 					while(x < l) {
-						r = chartorune(&contents[text->p1 + x], buf + i);
+						r = chartorune(&contents[s + x], buf + i);
 						x++;
 						i += r;
 						y -= r;
 					}
 					memmove(buf, buf + i, y);
-					text->p0 = text->p1 = text->p1 + l;
+					s += l;
 				}
 				if (r < 0)
 					fprint(2, "read: /dev/snarf: %r\n");
 				else
-					frinsert(text, &contents[text->p1], &contents[text->p1 + l], text->p1);
+					frinsert(text, &contents[start], &contents[s], start);
 				close(fd);
 				flushimage(display, 1);
 				save();
