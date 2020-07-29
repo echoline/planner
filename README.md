@@ -1,13 +1,11 @@
 a simple gtk planner
 
-![http://i.imgur.com/BneNbcE.png](http://i.imgur.com/BneNbcE.png)
+builds on *nix (with gtk3) and on windows (with mingw and gtk3)
 
-builds on *nix (with gtk3) and on windows (xp with mingw and gtk)
-
-It has come to my attention that a lot of people are STEALING my Public Domain software. Because it is in the Public Domain, I can't say much but my own code and README, this. I've never felt so anonymously loved. I can't remember if I designed this program or my professor did. I want to make a few design principles clear in my loop-back planning of this planner. First of all, I was going for a synthesis of good UI design and also good "unix" design. In the old days of unix, each user got a ~/.plan file. This app makes a well-organized ~/.plans/ directory for other unix programs. The good UI design is that the computer knows you want to save if you typed it, and it's overall very simple. I'm sorry I learned GTK over other options at this point in my life, but I'm sure if you trust GTK and read my code you will find it pleasantly auditable. The transition of unix to the world of graphics has been rough, and there is room for improvement in the directions of many programming schools of thought. In Linux, I've had it copy over the day's index.txt to ~/.plan, and read it with espeak at progressing volumes throughout the morning as a cue for getting out of bed and typing the command to brew coffee.
-
-Hallowed be the Ori
+![https://i.imgur.com/6Akzarn.png](https://i.imgur.com/6Akzarn.png)
 
 screenshot of Plan 9 version:
 
-![https://i.imgur.com/5cKMRGW.png](https://i.imgur.com/5cKMRGW.png)
+![https://i.imgur.com/4y0V2OQ.png](https://i.imgur.com/4y0V2OQ.png)
+
+this program aims to be a synthesis of good UI design and good unix design. it automatically saves every change to a flat-file directory tree laid out like YYYY/MM/DD/index.md, exactly like the werc blagh app, so with file linking or bind mounts you can use it to edit werc blog posts. it doesn't allow the location of the data to be changed over keeping the program simple. you can manage that with the OS on unix or plan 9, and you can manage synchronization with a revision control system. it aims for simplicity over built-in features and plays well with other programs.
