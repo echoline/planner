@@ -10,7 +10,7 @@ echo
 for YYYY in $HOME/.plans/[0-9][0-9][0-9][0-9]; do
 	for MM in $YYYY/[0-1][0-9]; do
 		for DD in $MM/[0-3][0-9]; do
-			if test -f $DD/index.txt; then
+			if test -f $DD/index.md; then
 				echo -n $(echo $(basename $DD) | sed "s,^0,,");
 				echo -n " ";
 				echo -n $(echo $MONTHS | cut -d' ' -f$(basename $MM));
