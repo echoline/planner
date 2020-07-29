@@ -488,7 +488,6 @@ save(void)
 	}
 
 	updateday(screen);
-	flushimage(display, 1);
 	free(fname);
 }
 
