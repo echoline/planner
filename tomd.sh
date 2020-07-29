@@ -3,16 +3,21 @@
 
 MONTHS="January February March April May June July August September October November December"
 
-u=$user
-if test -z $u; then
-	u=$USER;
+if test -z $title; then
+	u=$user
+	if test -z $u; then
+		u=$USER;
+	fi
+	u=$( echo $( echo $u | awk '{ print substr($0, 1, 1) }' | tr '[a-z]' '[A-Z]' )$( echo $u | awk '{ print substr($0, 2, length($0)-1) }' ) )
+
+	echo $u\'s planner data
+	echo =====
+	echo
+else
+	echo $title
+	echo =====
+	echo
 fi
-
-u=$( echo $( echo $u | awk '{ print substr($0, 1, 1) }' | tr '[a-z]' '[A-Z]' )$( echo $u | awk '{ print substr($0, 2, length($0)-1) }' ) )
-
-echo $u\'s planner data
-echo =====
-echo
 
 DIR=$1
 if test -z $DIR; then
