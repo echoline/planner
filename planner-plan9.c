@@ -81,7 +81,7 @@ drawday(Image *screen, int x, int y, int mday, Image *bg, Image *fg)
 	snprint(buf, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d/index.md", getenv("home"), year, tm->mon+1, mday);
 	fd = open(buf, OREAD);
 	if (fd > 0) {
-		r = read(fd, buf, BUFLEN-1);
+		r = read(fd, buf, 3 * UTFmax + 1);
 		if (r > 0) {
 			buf[r] = '\0';
 			buf[strcspn(buf, "\r\n")] = '\0';
@@ -151,14 +151,14 @@ updateall(Image *screen)
 	Point yearsize = Pt(4 * charwidth, charheight);
 	Point tmppt;
 
-	x = Dx(screen->r) - 10;
-	y = Dy(screen->r) - 10;
+	x = Dx(screen->r);
+	y = Dy(screen->r);
 
 	if (x < half * 2 || y < height) {
 		if (x < half * 2)
-			x = half * 2 + 10;
+			x = half * 2 + 20;
 		if (y < height)
-			y = height + 10;
+			y = height + 20;
 
 		resize(x, y);
 		return;
@@ -208,6 +208,7 @@ updateall(Image *screen)
 	draw(screen, textr, display->white, nil, ZP);
 	frinit(text, textr, display->defaultfont, screen, cols);
 	contentslen = 0;
+	flushimage(display, 1);
 
 	snprint(buf, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d/index.md", getenv("home"), year, tm->mon+1, tm->mday);
 	fd = open(buf, OREAD);
@@ -244,6 +245,7 @@ updateall(Image *screen)
 	for(x = 0; x < 7; x++) {
 		string(screen, addpt(daybuttons[x][0].min, Pt(0, -charheight)), display->black, ZP, display->defaultfont, weekdays[x]);
 	}
+	flushimage(display, 1);
 
 	mday = 0;
 	for (y = 0; y < 6; y++) {
@@ -261,9 +263,9 @@ updateall(Image *screen)
 		}
 	}
 
+	flushimage(display, 1);
 	free(buf);
 	free(runes);
-	flushimage(display, 1);
 }
 
 void
