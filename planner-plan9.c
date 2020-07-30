@@ -89,7 +89,7 @@ drawday(Image *screen, int x, int y, int mday, Image *bg, Image *fg)
 			if (rune == Runeerror)
 				r--;
 			buf[r] = '\0';
-			string(screen, addpt(daybuttons[x][y].min, Pt(0, charheight)), fg, ZP, display->defaultfont, buf);
+			_string(screen, addpt(daybuttons[x][y].min, Pt(0, charheight)), fg, ZP, display->defaultfont, buf, nil, r, daybuttons[x][y], bg, ZP, SoverD);
 		}
 		close(fd);
 	}
