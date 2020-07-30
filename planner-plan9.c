@@ -737,6 +737,7 @@ threadmain(int argc, char **argv)
 				frdrawsel(text, frptofchar(text, text->p0), text->p0, text->p1, 1);
 				flushimage(display, 1);
 			} else if (clickcount > 0) {
+				frtick(text, frptofchar(text, text->p1), 0);
 				while(text->p0 > 0 && !isspacerune(contents[text->p0 - 1])) text->p0--;
 				while(text->p1 < text->nchars && !isspacerune(contents[text->p1])) text->p1++;
 				frdrawsel(text, frptofchar(text, text->p0), text->p0, text->p1, 1);
