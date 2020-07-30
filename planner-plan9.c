@@ -608,7 +608,7 @@ threadmain(int argc, char **argv)
 				if (text->p0 == text->p1)
 					continue;
 				tosnarf();
-				memmove(&contents[text->p0], &contents[text->p1], contentslen - text->p1);
+				memmove(&contents[text->p0], &contents[text->p1], (contentslen - text->p1) * sizeof(Rune));
 				contentslen -= text->p1 - text->p0;
 				frdelete(text, text->p0, text->p1);
 				flushimage(display, 1);
@@ -627,7 +627,7 @@ threadmain(int argc, char **argv)
 				}
 
 				if (text->p0 != text->p1) {
-					memmove(&contents[text->p0], &contents[text->p1], contentslen - text->p1);
+					memmove(&contents[text->p0], &contents[text->p1], (contentslen - text->p1) * sizeof(Rune));
 					contentslen -= text->p1 - text->p0;
 					frdelete(text, text->p0, text->p1);
 				}
@@ -639,7 +639,7 @@ threadmain(int argc, char **argv)
 					y = r;
 					contentslen += l;
 					contents = realloc(contents, contentslen * sizeof(Rune));
-					memmove(&contents[s + l], &contents[s], contentslen - (s + l));
+					memmove(&contents[s + l], &contents[s], (contentslen - (s + l)) * sizeof(Rune));
 					i = 0;
 					x = 0;
 					while(x < l) {
