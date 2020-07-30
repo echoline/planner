@@ -31,7 +31,7 @@ for YYYY in $DIR/[1-2][0-9][0-9][0-9]; do
 				echo -n $(echo $(basename $DD) | sed "s,^0,,");
 				echo -n " ";
 				echo -n $(echo $MONTHS | awk "{ print $"$(basename $MM)" }");
-				echo -n " ";
+				echo -n ", ";
 				echo $(basename $YYYY);
 				echo ----
 				cat $DD/index.md;
