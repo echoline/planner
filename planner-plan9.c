@@ -21,10 +21,63 @@ Mousectl *mc;
 Keyboardctl *kc;
 Rune *contents = nil;
 int contentslen = 0;
+int before = 0;
+int after = 0;
 int half;
 int height;
 int charwidth;
 int charheight;
+
+void
+drawtext(void)
+{
+	Rectangle textr = Rpt(addpt(screen->r.min, Pt(half, 0)), screen->r.max);
+
+	draw(screen, textr, display->white, nil, ZP);
+	frclear(text, 0);
+	frinit(text, textr, display->defaultfont, screen, cols);
+	frinsert(text, &contents[before], &contents[contentslen], text->p1);
+
+	after = contentslen - before - text->nchars;
+}
+
+void
+scrollup(int lines)
+{
+	int l = lines;
+
+	while(l > 0 && before > 0) {
+		before--;
+		if (contents[before] == L'\n')
+			l--;
+	}
+	while (before > 0 && contents[before-1] != L'\n')
+		before--;
+
+	frtick(text, frptofchar(text, text->p1), 0);
+	drawtext();
+	frtick(text, frptofchar(text, text->p1), 0);
+	text->p0 = text->p1 = 0;
+	frtick(text, frptofchar(text, text->p1), 1);
+	flushimage(display, 1);
+}
+
+void
+scrolldown(int lines)
+{
+	int l = lines;
+
+	while(l > 0 && before < contentslen) {
+		if (contents[before++] == L'\n')
+			l--;
+	}
+
+	frtick(text, frptofchar(text, text->p1), 0);
+	drawtext();
+	frtick(text, frptofchar(text, text->p1), 1);
+	flushimage(display, 1);
+}
+
 
 int
 calccharwidth(void)
@@ -205,12 +258,9 @@ updateall(Image *screen)
 	}
 
 	draw(screen, screen->r, back, nil, ZP);
-
-	frclear(text, 0);
 	draw(screen, textr, display->white, nil, ZP);
-	frinit(text, textr, display->defaultfont, screen, cols);
-	contentslen = 0;
 	flushimage(display, 1);
+	contentslen = 0;
 
 	snprint(buf, BUFLEN-1, "%s/lib/plans/%d/%02d/%02d/index.md", getenv("home"), year, tm->mon+1, tm->mday);
 	fd = open(buf, OREAD);
@@ -221,13 +271,15 @@ updateall(Image *screen)
 				if (runes[y] != Runeerror)
 					y++;
 			}
-			frinsert(text, runes, &runes[y], text->p1);
-			contents = realloc(contents, (contentslen + y) * sizeof(Rune));
+			contents = realloc(contents, (contentslen + y + 1) * sizeof(Rune));
 			memcpy(&contents[contentslen], runes, y * sizeof(Rune));
 			contentslen += y;
 		}
 		close(fd);
 	}
+
+	before = 0;
+	drawtext();
 
 	draw(screen, buttons[0], display->white, nil, ZP);
 	string(screen, buttons[0].min, display->black, ZP, display->defaultfont, "Today");
@@ -291,7 +343,7 @@ keyboardthread(void *)
 	Rune r[2];
 	Rectangle textr;
 	int i, p, l, w;
-	ulong dummy = 1;
+	ulong p1;
 
 	while(recv(kc->c, r) > 0){
 		textr = Rpt(addpt(screen->r.min, Pt(half, 0)), screen->r.max);
@@ -304,7 +356,7 @@ keyboardthread(void *)
 			if (text->p0 != text->p1)
 				continue;
 
-			for (p = text->p0; p > 0 && contents[p-1] != L'\n'; p--);
+			for (p = text->p0; p > 0 && contents[before + p-1] != L'\n'; p--);
 			frtick(text, frptofchar(text, text->p0), 0);
 			text->p0 = text->p1 = p;
 			frtick(text, frptofchar(text, text->p0), 1);
@@ -314,7 +366,7 @@ keyboardthread(void *)
 			if (text->p0 != text->p1)
 				continue;
 
-			for (p = text->p1; p < text->nchars && contents[p] != L'\n'; p++);
+			for (p = text->p1; p < text->nchars && contents[before + p] != L'\n'; p++);
 			frtick(text, frptofchar(text, text->p1), 0);
 			text->p0 = text->p1 = p;
 			frtick(text, frptofchar(text, text->p1), 1);
@@ -324,6 +376,9 @@ keyboardthread(void *)
 			if (text->p0 != text->p1)
 				continue;
 
+			if (before > 0)
+				scrollup(text->maxlines / 2);
+
 			frtick(text, frptofchar(text, text->p0), 0);
 			text->p0 = text->p1 = 0;
 			frtick(text, frptofchar(text, text->p0), 1);
@@ -332,6 +387,9 @@ keyboardthread(void *)
 		} else if (r[0] == Kpgdown) {
 			if (text->p0 != text->p1)
 				continue;
+
+			if (after > 0)
+				scrolldown(text->maxlines / 2);
 
 			frtick(text, frptofchar(text, text->p0), 0);
 			text->p0 = text->p1 = text->nchars;
@@ -344,14 +402,24 @@ keyboardthread(void *)
 			if (text->p0 == text->p1)
 				text->p0--;
 
-			memmove(&contents[text->p0], &contents[text->p1], (contentslen - text->p1) * sizeof(Rune));
+			memmove(&contents[before + text->p0], &contents[before + text->p1], (contentslen - before - text->p1) * sizeof(Rune));
 			contentslen -= text->p1 - text->p0;
 			frtick(text, frptofchar(text, text->p1), 0);
 			frdelete(text, text->p0, text->p1);
+			p1 = text->p1;
+			drawtext();
+			frtick(text, frptofchar(text, text->p1), 0);
+			text->p0 = text->p1 = p1;
 			frtick(text, frptofchar(text, text->p1), 1);
 		} else if (r[0] == Kleft) {
-			if (text->p1 == 0 || text->p0 != text->p1)
+			if (text->p0 != text->p1)
 				continue;
+
+			if (text->p1 == 0) {
+				if (before > 0)
+					scrollup(1);
+				continue;
+			}
 
 			frtick(text, frptofchar(text, text->p1), 0);
 			text->p1--;
@@ -360,8 +428,14 @@ keyboardthread(void *)
 			flushimage(display, 1);
 			continue;
 		} else if (r[0] == Kright) {
-			if (text->p1 == text->nchars || text->p0 != text->p1)
+			if (text->p0 != text->p1)
 				continue;
+
+			if (text->p1 == text->nchars) {
+				if (after > 0)
+					scrolldown(1);
+				continue;
+			}
 
 			frtick(text, frptofchar(text, text->p1), 0);
 			text->p1++;
@@ -373,11 +447,14 @@ keyboardthread(void *)
 			if (text->p0 != text->p1)
 				continue;
 
-			for (p = text->p0, l = 0; p > 0 && contents[p-1] != L'\n'; p--, l++);
-			if (p == 0)
+			for (p = text->p0, l = 0; p > 0 && contents[before + p-1] != L'\n'; p--, l++);
+			if (p == 0) {
+				if (before > 0)
+					scrollup(1);
 				continue;
+			}
 
-			for (i = p - 1, w = 0; i > 0 && contents[i-1] != L'\n'; i--, w++);
+			for (i = p - 1, w = 0; i > 0 && contents[before + i-1] != L'\n'; i--, w++);
 			frtick(text, frptofchar(text, text->p0), 0);
 			text->p0 = text->p1 = l > w? i + w: i + l;
 			frtick(text, frptofchar(text, text->p0), 1);
@@ -387,12 +464,15 @@ keyboardthread(void *)
 			if (text->p1 != text->p0)
 				continue;
 
-			for (p = text->p0, l = 0; p > 0 && contents[p-1] != L'\n'; p--, l++);
-			for (p = text->p0; p < text->nchars && contents[p] != L'\n'; p++);
-			if (p == text->nchars)
+			for (p = text->p0, l = 0; p > 0 && contents[before + p-1] != L'\n'; p--, l++);
+			for (p = text->p0; p < text->nchars && contents[before + p] != L'\n'; p++);
+			if (p == text->nchars) {
+				if (after > 0)
+					scrolldown(1);
 				continue;
+			}
 
-			for (i = p + 1, w = 0; i < text->nchars && contents[i] != L'\n'; i++, w++);
+			for (i = p + 1, w = 0; i < text->nchars && contents[before + i] != L'\n'; i++, w++);
 			frtick(text, frptofchar(text, text->p0), 0);
 			text->p0 = text->p1 = l > w? p + w + 1: p + l + 1;
 			frtick(text, frptofchar(text, text->p0), 1);
@@ -400,15 +480,15 @@ keyboardthread(void *)
 			continue;
 		} else {
 			if (text->p0 != text->p1) {
-				memmove(&contents[text->p0], &contents[text->p1], (contentslen - text->p1) * sizeof(Rune));
+				memmove(&contents[before + text->p0], &contents[before + text->p1], (contentslen - before - text->p1) * sizeof(Rune));
 				contentslen -= text->p1 - text->p0;
 				frdelete(text, text->p0, text->p1);
 			}
 
 			contentslen++;
-			contents = realloc(contents, contentslen * sizeof(Rune));
-			memmove(&contents[text->p1 + 1], &contents[text->p1], (contentslen - text->p1 - 1) * sizeof(Rune));
-			contents[text->p1] = r[0];
+			contents = realloc(contents, (contentslen+1) * sizeof(Rune));
+			memmove(&contents[before + text->p1 + 1], &contents[before + text->p1], (contentslen - before - text->p1 - 1) * sizeof(Rune));
+			contents[before + text->p1] = r[0];
 			frinsert(text, &r[0], &r[1], text->p1);
 		}
 
@@ -517,7 +597,7 @@ tosnarf(void)
 	for (i = text->p0; i < text->p1;) {
 		a = 0;
 		while(a < (BUFLEN-UTFmax) && i < text->p1) {
-			l = runetochar(buf + a, &contents[i++]);
+			l = runetochar(buf + a, &contents[before + i++]);
 			a += l;
 		}
 		l = 0;
@@ -549,10 +629,10 @@ threadmain(int argc, char **argv)
 	int fd;
 	char *buf;
 	int r, l, i, s, start;
-	ulong dummy = 1;
 	long click = 0;
 	long clickcount = 0;
 	int dt;
+	ulong p;
 	Point caldims;
 
 	if(initdraw(0,0,"planner") < 0)
@@ -584,6 +664,8 @@ threadmain(int argc, char **argv)
 	t = time(nil);
 
 	buf = emalloc(BUFLEN);
+	contents = emalloc(1 * sizeof(Rune));
+	contents[0] = L'\0';
 
 	cols[TEXT] = display->black;
 	cols[BACK] = display->white;
@@ -608,9 +690,15 @@ threadmain(int argc, char **argv)
 				if (text->p0 == text->p1)
 					continue;
 				tosnarf();
-				memmove(&contents[text->p0], &contents[text->p1], (contentslen - text->p1) * sizeof(Rune));
+				memmove(&contents[before + text->p0], &contents[before + text->p1], (contentslen - before - text->p1) * sizeof(Rune));
 				contentslen -= text->p1 - text->p0;
 				frdelete(text, text->p0, text->p1);
+				p = text->p1;
+				frtick(text, frptofchar(text, text->p1), 0);
+				drawtext();
+				frtick(text, frptofchar(text, text->p1), 0);
+				text->p0 = text->p1 = p;
+				frtick(text, frptofchar(text, text->p1), 1);
 				flushimage(display, 1);
 				save();
 				break;
@@ -627,10 +715,11 @@ threadmain(int argc, char **argv)
 				}
 
 				if (text->p0 != text->p1) {
-					memmove(&contents[text->p0], &contents[text->p1], (contentslen - text->p1) * sizeof(Rune));
+					memmove(&contents[before + text->p0], &contents[before + text->p1], (contentslen - before - text->p1) * sizeof(Rune));
 					contentslen -= text->p1 - text->p0;
 					frdelete(text, text->p0, text->p1);
 				}
+				frtick(text, frptofchar(text, text->p1), 0);
 
 				y = 0;
 				start = s = text->p1;
@@ -638,12 +727,12 @@ threadmain(int argc, char **argv)
 					l = utfnlen(buf, r);
 					y = r;
 					contentslen += l;
-					contents = realloc(contents, contentslen * sizeof(Rune));
-					memmove(&contents[s + l], &contents[s], (contentslen - (s + l)) * sizeof(Rune));
+					contents = realloc(contents, (contentslen+1) * sizeof(Rune));
+					memmove(&contents[before + s + l], &contents[before + s], (contentslen - before - (s + l)) * sizeof(Rune));
 					i = 0;
 					x = 0;
 					while(x < l) {
-						r = chartorune(&contents[s + x], buf + i);
+						r = chartorune(&contents[before + s + x], buf + i);
 						x++;
 						i += r;
 						y -= r;
@@ -654,8 +743,14 @@ threadmain(int argc, char **argv)
 				if (r < 0)
 					fprint(2, "read: /dev/snarf: %r\n");
 				else
-					frinsert(text, &contents[start], &contents[s], start);
+					frinsert(text, &contents[before + start], &contents[before + s], start);
 				close(fd);
+				p = text->p1;
+				frtick(text, frptofchar(text, text->p1), 0);
+				drawtext();
+				frtick(text, frptofchar(text, text->p1), 0);
+				text->p0 = text->p1 = p;
+				frtick(text, frptofchar(text, text->p1), 1);
 				flushimage(display, 1);
 				save();
 				break;
@@ -665,6 +760,20 @@ threadmain(int argc, char **argv)
 				break;	
 			}
 			continue;
+		}
+
+		textr = Rpt(Pt(screen->r.min.x + half, screen->r.min.y), screen->r.max);
+
+		if (m.buttons & 8 && ptinrect(m.xy, textr)) {
+			s = m.xy.y - textr.min.y;
+			s /= charheight;
+			scrollup(s);
+		}
+
+		if (m.buttons & 16 && ptinrect(m.xy, textr)) {
+			s = m.xy.y - textr.min.y;
+			s /= charheight;
+			scrolldown(s);
 		}
 
 		if (!(m.buttons & 1))
@@ -721,7 +830,6 @@ threadmain(int argc, char **argv)
 			}
 		}
 
-		textr = Rpt(Pt(screen->r.min.x + half, screen->r.min.y), screen->r.max);
 		if (ptinrect(m.xy, textr)) {
 			dt = m.msec - click;
 			click = m.msec;
@@ -732,14 +840,14 @@ threadmain(int argc, char **argv)
 				frselect(text, mc);
 			}
 			if (clickcount > 1) {
-				while(text->p0 > 0 && contents[text->p0 - 1] != L'\n') text->p0--;
-				while(text->p1 < text->nchars && contents[text->p1-1] != L'\n') text->p1++;
+				while(text->p0 > 0 && contents[before + text->p0 - 1] != L'\n') text->p0--;
+				while(text->p1 < text->nchars && contents[before + text->p1-1] != L'\n') text->p1++;
 				frdrawsel(text, frptofchar(text, text->p0), text->p0, text->p1, 1);
 				flushimage(display, 1);
 			} else if (clickcount > 0) {
 				frtick(text, frptofchar(text, text->p1), 0);
-				while(text->p0 > 0 && !isspacerune(contents[text->p0 - 1])) text->p0--;
-				while(text->p1 < text->nchars && !isspacerune(contents[text->p1])) text->p1++;
+				while(text->p0 > 0 && !isspacerune(contents[before + text->p0 - 1])) text->p0--;
+				while(text->p1 < text->nchars && !isspacerune(contents[before + text->p1])) text->p1++;
 				frdrawsel(text, frptofchar(text, text->p0), text->p0, text->p1, 1);
 				flushimage(display, 1);
 			}
