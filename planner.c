@@ -122,7 +122,6 @@ on_calendar1_day_selected(GtkCalendar *widget, gpointer arg) {
 	dir = makepath(year, month, day);
 	path = g_strconcat(dir, "index.md", NULL);
 	load(stuff->notes);
-
 }
 
 G_MODULE_EXPORT void
@@ -142,7 +141,7 @@ on_today_clicked (GtkButton *widget, gpointer arg) {
 				g_date_get_year (&date));
 	gtk_calendar_select_day (stuff->calendar,
 				g_date_get_day (&date));
-	on_calendar1_day_selected (stuff->calendar, stuff);
+	on_calendar1_day_selected(stuff->calendar, stuff);
 }
 
 int main(int argc, char **argv) {
@@ -172,6 +171,7 @@ int main(int argc, char **argv) {
 	gtk_calendar_set_detail_width_chars(stuff->calendar, 3);
 	gtk_calendar_set_detail_height_rows(stuff->calendar, 1);
 	on_calendar1_day_selected(stuff->calendar, stuff);
+	loading = 0;
 	g_signal_connect (stuff->calendar, "day-selected", G_CALLBACK(on_calendar1_day_selected), stuff);
 	gtk_grid_attach (GTK_GRID (grid), GTK_WIDGET (stuff->calendar), 0, 1, 1, 9);
 
