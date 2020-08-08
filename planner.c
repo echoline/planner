@@ -7,7 +7,7 @@
 gchar *path = NULL;
 gchar *dir = NULL;
 GtkWidget *window;
-gchar loading = 0;
+gboolean loadflag = 0;
 
 typedef struct {
 	GtkTextView *notes;
@@ -57,12 +57,6 @@ save(GtkTextBuffer *buffer) {
 	GtkTextIter start, end;
 	gchar *text, *errstr;
 
-	// don't save on load
-	if (loading == 1) {
-		loading = 0;
-		return;
-	}
-
 	if (g_mkdir_with_parents(dir, 0700) != 0) {
 		errstr = g_strdup_printf("unable to make directory %s", dir);
 		error(errstr);
@@ -98,7 +92,7 @@ load(GtkTextView *widget) {
 		text = g_strdup("");
 	}
 
-	loading = 1;
+	loadflag = 1;
 	buffer = gtk_text_view_get_buffer(widget);
 	gtk_text_buffer_set_text(buffer, text, length);
 
@@ -126,7 +120,10 @@ on_calendar1_day_selected(GtkCalendar *widget, gpointer arg) {
 
 G_MODULE_EXPORT void
 on_notes_changed(GtkTextBuffer *widget, gpointer arg) {
-	save(widget);
+	if (loadflag)
+		loadflag = 0;
+	else
+		save(widget);
 	gtk_widget_queue_draw(GTK_WIDGET(((GtkStuff*)arg)->calendar));
 }
 
@@ -142,6 +139,7 @@ on_today_clicked (GtkButton *widget, gpointer arg) {
 	gtk_calendar_select_day (stuff->calendar,
 				g_date_get_day (&date));
 	on_calendar1_day_selected(stuff->calendar, stuff);
+	loadflag = 0;
 }
 
 int main(int argc, char **argv) {
@@ -171,7 +169,7 @@ int main(int argc, char **argv) {
 	gtk_calendar_set_detail_width_chars(stuff->calendar, 3);
 	gtk_calendar_set_detail_height_rows(stuff->calendar, 1);
 	on_calendar1_day_selected(stuff->calendar, stuff);
-	loading = 0;
+	loadflag = 0;
 	g_signal_connect (stuff->calendar, "day-selected", G_CALLBACK(on_calendar1_day_selected), stuff);
 	gtk_grid_attach (GTK_GRID (grid), GTK_WIDGET (stuff->calendar), 0, 1, 1, 9);
 
