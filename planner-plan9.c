@@ -208,9 +208,9 @@ updateall(Image *screen)
 	y = Dy(screen->r);
 	if (x < half * 2 || y < height) {
 		if (x < half * 2)
-			x = half * 2 + 20;
+			x = half * 2 + 40;
 		if (y < height)
-			y = height + 20;
+			y = height + 40;
 
 		resize(x, y);
 		return;
