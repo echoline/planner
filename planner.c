@@ -95,6 +95,7 @@ load(GtkTextView *widget) {
 	loadflag = 1;
 	buffer = gtk_text_view_get_buffer(widget);
 	gtk_text_buffer_set_text(buffer, text, length);
+	loadflag = 0;
 
 	g_free(text);
 }
